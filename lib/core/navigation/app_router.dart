@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import '../../features/dashboard/domain/entities/furniture.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../../features/dashboard/presentation/pages/furniture_detail_page.dart';
 import '../../features/vr_tour/presentation/pages/vr_tour_page.dart';
 import '../../features/ar_placement/presentation/pages/ar_placement_page.dart';
 
@@ -11,6 +12,14 @@ final GoRouter appRouter = GoRouter(
       path: '/',
       name: 'dashboard',
       builder: (context, state) => const DashboardPage(),
+    ),
+    GoRoute(
+      path: '/detail',
+      name: 'detail',
+      builder: (context, state) {
+        final furniture = state.extra as Furniture;
+        return FurnitureDetailPage(furniture: furniture);
+      },
     ),
     GoRoute(
       path: '/vr',

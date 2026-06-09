@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +19,9 @@ import '../bloc/ar_placement_bloc.dart';
 import '../bloc/ar_placement_event.dart';
 import '../bloc/ar_placement_state.dart';
 import '../../../dashboard/domain/entities/furniture.dart';
+import '../../../../core/presentation/widgets/glass_container.dart';
+import '../widgets/radar_scanner.dart';
+import '../../../../core/utils/battery_optimizer.dart';
 
 class ARPlacementPage extends StatefulWidget {
   final Furniture? selectedFurniture;
@@ -41,6 +45,26 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
   // Local state for checking simulator fallback
   bool _useSimulationFallback = false;
 
+  // Spatial controls state
+  double _rotationAngle = 0.0; // in degrees (0 - 360)
+  double _scaleFactor = 1.0;   // scale factor (0.2 - 2.0)
+  bool _reduceEffects = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBatteryStatus();
+  }
+
+  Future<void> _checkBatteryStatus() async {
+    final reduce = await BatteryOptimizer().shouldReduceEffects();
+    if (mounted) {
+      setState(() {
+        _reduceEffects = reduce;
+      });
+    }
+  }
+
   @override
   void dispose() {
     // CRITICAL: Clean up all placed 3D objects and anchors
@@ -49,24 +73,27 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
   }
 
   void _cleanupARResources() {
-    // Remove all loaded 3D nodes from memory
     if (_arObjectManager != null) {
       for (final node in _placedNodes) {
         _arObjectManager!.removeNode(node);
       }
     }
-    // Remove all registered anchors
     if (_arAnchorManager != null) {
       for (final anchor in _placedAnchors) {
         _arAnchorManager!.removeAnchor(anchor);
       }
     }
-    // Clear local tracking lists
     _placedNodes.clear();
     _placedAnchors.clear();
-
-    // Call dispose on session managers if supported
     _arSessionManager?.dispose();
+  }
+
+  void _updatePlacedModelsTransform() {
+    if (_placedNodes.isEmpty) return;
+    final lastNode = _placedNodes.last;
+    final rad = _rotationAngle * math.pi / 180.0;
+    lastNode.scale = vector.Vector3(_scaleFactor * 0.5, _scaleFactor * 0.5, _scaleFactor * 0.5);
+    lastNode.rotation = vector.Vector4(0.0, 1.0, 0.0, rad);
   }
 
   @override
@@ -88,6 +115,21 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
                 ? _buildSimulationView()
                 : _buildARView(context),
 
+            // Holographic radar scanner during initial search
+            BlocBuilder<ARPlacementBloc, ARPlacementState>(
+              builder: (context, state) {
+                if (state is ARPlacementSuccess &&
+                    state.selectedFurniture != null &&
+                    !state.isPlaneDetected &&
+                    !_useSimulationFallback) {
+                  return const Center(
+                    child: RadarScanner(),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+
             // Top Status Bar (Furniture selected details)
             Positioned(
               top: MediaQuery.of(context).padding.top + 16,
@@ -106,6 +148,14 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
 
             // BLoC State Loading / Success Indicator Overlay
             _buildStateOverlay(),
+
+            // Spatial Controls Sliders (Displays when an item is selected)
+            Positioned(
+              bottom: 195,
+              left: 16,
+              right: 16,
+              child: _buildSpatialControlSliders(),
+            ),
 
             // Bottom Control Panel
             Positioned(
@@ -151,37 +201,33 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
     _arObjectManager = arObjectManager;
     _arAnchorManager = arAnchorManager;
 
-    // Initialize session with customized visual settings
     _arSessionManager!.onInitialize(
       showFeaturePoints: true,
       showPlanes: true,
       customPlaneTexturePath: "assets/images/triangle.png",
       showWorldOrigin: false,
       handleTaps: true,
+      handlePans: true,
+      handleRotation: true,
     );
     _arObjectManager!.onInitialize();
 
-    // Set callback tap listeners
     _arSessionManager!.onPlaneOrPointTap = (List<ARHitTestResult> hitTestResults) {
       _onPlaneTap(context, hitTestResults);
     };
 
-    // Update BLoC that plane detection is scanning/active
     context.read<ARPlacementBloc>().add(const PlaneDetectedUpdate(true));
   }
 
-  // Handle taps on detected real-world surfaces
   Future<void> _onPlaneTap(BuildContext context, List<ARHitTestResult> hitTestResults) async {
     final bloc = context.read<ARPlacementBloc>();
     final currentState = bloc.state;
 
     if (currentState is ARPlacementSuccess && currentState.selectedFurniture != null) {
-      // Find the first valid plane collision result
       final planeHit = hitTestResults.firstWhere(
         (result) => result.type == ARHitTestResultType.plane,
       );
 
-      // Create a unique anchor at the tapped surface position
       final anchor = ARPlaneAnchor(pose: planeHit.worldTransform);
       final didAddAnchor = await _arAnchorManager?.addAnchor(anchor);
 
@@ -189,13 +235,13 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
         _placedAnchors.add(anchor);
         bloc.add(PlaceFurnitureModel(anchor.name));
 
-        // Load the 3D model node attached to this anchor
+        final rad = _rotationAngle * math.pi / 180.0;
         final node = ARNode(
           type: NodeType.localGLTF2,
           uri: currentState.selectedFurniture!.glbPath,
-          scale: vector.Vector3(0.5, 0.5, 0.5),
+          scale: vector.Vector3(_scaleFactor * 0.5, _scaleFactor * 0.5, _scaleFactor * 0.5),
           position: vector.Vector3(0.0, 0.0, 0.0),
-          rotation: vector.Vector4(0.0, 1.0, 0.0, 0.0),
+          rotation: vector.Vector4(0.0, 1.0, 0.0, rad),
         );
 
         final didAddNode = await _arObjectManager?.addNode(node, planeAnchor: anchor);
@@ -206,16 +252,16 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
     }
   }
 
-  // Elegant simulation camera screen for emulators/non-AR devices
   Widget _buildSimulationView() {
+    final rad = _rotationAngle * math.pi / 180.0;
+
     return Container(
-      color: Colors.grey[900],
+      color: const Color(0xFF0F0F16),
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Simulated camera static/visual grid
           Opacity(
-            opacity: 0.15,
+            opacity: 0.1,
             child: GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 10),
@@ -225,11 +271,39 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.videocam_outlined, size: 72, color: Color(0xFF00E6FF)),
-              const SizedBox(height: 12),
+              Transform.scale(
+                scale: _scaleFactor,
+                child: Transform.rotate(
+                  angle: rad,
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF00E6FF).withOpacity(0.08),
+                      border: Border.all(
+                        color: const Color(0xFF00E6FF).withOpacity(0.4),
+                        width: 2.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00E6FF).withOpacity(0.25),
+                          blurRadius: 24,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.chair_alt,
+                      size: 80,
+                      color: Color(0xFF00E6FF),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               const Text(
                 'AR Simulator Active',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5),
               ),
               const SizedBox(height: 6),
               Text(
@@ -250,9 +324,11 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF8A84FF),
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 ),
                 icon: const Icon(Icons.touch_app),
-                label: const Text('Simulate Surface Tap'),
+                label: const Text('Simulate Surface Tap', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -262,42 +338,50 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
   }
 
   Widget _buildHeaderOverlay(BuildContext context) {
+    final blurVal = _reduceEffects ? 0.0 : 12.0;
+    final opacityVal = _reduceEffects ? 0.35 : 0.1;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Back Button
-        ClipRRect(
+        // Back Button in Glass
+        GlassContainer(
+          width: 50,
+          height: 50,
+          opacity: opacityVal,
+          blur: blurVal,
           borderRadius: BorderRadius.circular(14),
-          child: Container(
-            color: Colors.black.withOpacity(0.6),
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => context.pop(),
-            ),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+            onPressed: () => context.pop(),
           ),
         ),
 
-        // Simulated/Native Engine Toggle
-        ClipRRect(
+        // Simulated/Native Engine Toggle in Glass
+        GlassContainer(
+          height: 50,
+          opacity: opacityVal,
+          blur: blurVal,
           borderRadius: BorderRadius.circular(14),
-          child: Container(
-            color: Colors.black.withOpacity(0.6),
-            child: TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _useSimulationFallback = !_useSimulationFallback;
-                });
-                _cleanupARResources();
-              },
-              icon: Icon(
-                _useSimulationFallback ? Icons.mobile_screen_share : Icons.videocam,
-                color: const Color(0xFF00E6FF),
-                size: 16,
-              ),
-              label: Text(
-                _useSimulationFallback ? 'Use Native' : 'Use Simulation',
-                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-              ),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _useSimulationFallback = !_useSimulationFallback;
+              });
+              _cleanupARResources();
+            },
+            style: TextButton.styleFrom(padding: EdgeInsets.zero),
+            icon: Icon(
+              _useSimulationFallback ? Icons.mobile_screen_share : Icons.videocam,
+              color: const Color(0xFF00E6FF),
+              size: 16,
+            ),
+            label: Text(
+              _useSimulationFallback ? 'Use Native' : 'Use Simulation',
+              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
             ),
           ),
         ),
@@ -306,9 +390,13 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
   }
 
   Widget _buildInstructionBanner() {
+    final blurVal = _reduceEffects ? 0.0 : 12.0;
+    final opacityVal = _reduceEffects ? 0.35 : 0.15;
+
     return BlocBuilder<ARPlacementBloc, ARPlacementState>(
       builder: (context, state) {
         String message = 'Scanning room layout...';
+        bool isLocked = false;
         if (state is ARPlacementSuccess) {
           if (state.selectedFurniture == null) {
             message = 'Select furniture from bottom drawer to start projecting';
@@ -316,29 +404,55 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
             message = 'Slowly rotate phone to scan floor surface';
           } else {
             message = 'Surface detected! Tap anywhere on plane to place ${state.selectedFurniture!.name}';
+            isLocked = true;
           }
         }
-        return Container(
+        return GlassContainer(
+          opacity: opacityVal,
+          blur: blurVal,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF8A84FF).withOpacity(0.3), width: 1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isLocked ? const Color(0xFF00E6FF).withOpacity(0.4) : const Color(0xFF8A84FF).withOpacity(0.3),
+            width: 1.5,
           ),
           child: Row(
             children: [
-              const Icon(Icons.info_outline, color: Color(0xFF00E6FF), size: 20),
+              _buildLiveIndicator(isLocked ? const Color(0xFF00E6FF) : const Color(0xFF8A84FF)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   message,
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildLiveIndicator(Color color) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.6),
+            blurRadius: 6,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
     );
   }
 
@@ -370,7 +484,96 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
     );
   }
 
+  Widget _buildSpatialControlSliders() {
+    final blurVal = _reduceEffects ? 0.0 : 12.0;
+    final opacityVal = _reduceEffects ? 0.35 : 0.12;
+
+    return BlocBuilder<ARPlacementBloc, ARPlacementState>(
+      builder: (context, state) {
+        if (state is! ARPlacementSuccess || state.selectedFurniture == null) {
+          return const SizedBox.shrink();
+        }
+
+        return GlassContainer(
+          opacity: opacityVal,
+          blur: blurVal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.rotate_right, color: Color(0xFF00E6FF), size: 16),
+                  const SizedBox(width: 8),
+                  const Text('ROTATE', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: const Color(0xFF00E6FF),
+                        inactiveTrackColor: Colors.white12,
+                        thumbColor: Colors.white,
+                        trackHeight: 2.0,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                      ),
+                      child: Slider(
+                        value: _rotationAngle,
+                        min: 0,
+                        max: 360,
+                        onChanged: (val) {
+                          setState(() {
+                            _rotationAngle = val;
+                          });
+                          _updatePlacedModelsTransform();
+                        },
+                      ),
+                    ),
+                  ),
+                  Text('${_rotationAngle.toInt()}°', style: const TextStyle(color: Colors.white, fontSize: 10, fontFamily: 'monospace')),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.photo_size_select_large_outlined, color: Color(0xFF8A84FF), size: 16),
+                  const SizedBox(width: 8),
+                  const Text('SCALE', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: const Color(0xFF8A84FF),
+                        inactiveTrackColor: Colors.white12,
+                        thumbColor: Colors.white,
+                        trackHeight: 2.0,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                      ),
+                      child: Slider(
+                        value: _scaleFactor,
+                        min: 0.2,
+                        max: 2.0,
+                        onChanged: (val) {
+                          setState(() {
+                            _scaleFactor = val;
+                          });
+                          _updatePlacedModelsTransform();
+                        },
+                      ),
+                    ),
+                  ),
+                  Text('${_scaleFactor.toStringAsFixed(1)}x', style: const TextStyle(color: Colors.white, fontSize: 10, fontFamily: 'monospace')),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildBottomControlPanel(BuildContext context) {
+    final blurVal = _reduceEffects ? 0.0 : 12.0;
+    final opacityVal = _reduceEffects ? 0.35 : 0.15;
+
     return BlocBuilder<ARPlacementBloc, ARPlacementState>(
       builder: (context, state) {
         Furniture? selected;
@@ -380,24 +583,15 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
           placedCount = state.placedAnchorIds.length;
         }
 
-        return Container(
+        return GlassContainer(
+          opacity: opacityVal,
+          blur: blurVal,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E1E2E).withOpacity(0.95),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.08), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Furniture projection info
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -405,36 +599,51 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          selected != null ? 'Selected: ${selected.name}' : 'No Furniture Selected',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Text(
+                              selected != null ? 'Selected: ${selected.name}' : 'No Furniture Selected',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (_reduceEffects) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('SAVER', style: TextStyle(color: Colors.amber, fontSize: 6, fontWeight: FontWeight.bold)),
+                              ),
+                            ]
+                          ],
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           selected != null ? 'File: ${selected.glbPath.split('/').last}' : 'Tap grid item below',
-                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                          style: const TextStyle(color: Colors.white38, fontSize: 10),
                         ),
                       ],
                     ),
                   ),
                   Row(
                     children: [
-                      // Active projection count indicator
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF8A84FF).withOpacity(0.15),
+                          color: const Color(0xFF00E6FF).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF00E6FF).withOpacity(0.2), width: 1),
                         ),
                         child: Text(
                           '$placedCount Projected',
-                          style: const TextStyle(color: Color(0xFF8A84FF), fontSize: 11, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Color(0xFF00E6FF), fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Clear button
                       IconButton(
-                        icon: const Icon(Icons.refresh, color: Colors.white),
+                        icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
                         onPressed: () {
                           _cleanupARResources();
                           context.read<ARPlacementBloc>().add(ClearPlacedModels());
@@ -447,11 +656,11 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
               ),
               const SizedBox(height: 16),
 
-              // Horizontal miniature list for quick switching models
               SizedBox(
                 height: 60,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   children: [
                     _buildSwitchItemCard(
                       context,
@@ -509,16 +718,33 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
       onTap: () {
         context.read<ARPlacementBloc>().add(SelectFurnitureForAR(furniture));
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
         width: 100,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8A84FF).withOpacity(0.15) : Colors.white.withOpacity(0.04),
-          borderRadius: BorderRadius.circular(12),
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [Color(0xFF8A84FF), Color(0xFF6C63FF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isSelected ? null : Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? const Color(0xFF8A84FF) : Colors.white12,
-            width: 1.5,
+            color: isSelected ? const Color(0xFF00E6FF).withOpacity(0.8) : Colors.white12,
+            width: isSelected ? 1.5 : 1.0,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF8A84FF).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  )
+                ]
+              : null,
         ),
         child: Center(
           child: Column(
@@ -526,8 +752,8 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
             children: [
               Icon(
                 Icons.chair_outlined,
-                size: 18,
-                color: isSelected ? const Color(0xFF8A84FF) : Colors.white54,
+                size: 16,
+                color: isSelected ? Colors.white : Colors.white54,
               ),
               const SizedBox(height: 4),
               Text(

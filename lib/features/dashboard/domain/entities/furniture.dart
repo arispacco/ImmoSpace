@@ -13,6 +13,20 @@ class Furniture extends Equatable {
     required this.glbPath,
   });
 
+  Furniture copyWith({
+    String? id,
+    String? name,
+    String? category,
+    String? glbPath,
+  }) {
+    return Furniture(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      glbPath: glbPath ?? this.glbPath,
+    );
+  }
+
   @override
   List<Object?> get props => [id, name, category, glbPath];
 }
