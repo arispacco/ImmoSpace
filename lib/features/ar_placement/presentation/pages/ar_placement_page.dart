@@ -702,6 +702,26 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
                       ),
                       selected,
                     ),
+                    _buildSwitchItemCard(
+                      context,
+                      const Furniture(
+                        id: '5',
+                        name: 'Sheen Chair',
+                        category: 'Living Room',
+                        glbPath: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/SheenChair/glTF-Binary/SheenChair.glb',
+                      ),
+                      selected,
+                    ),
+                    _buildSwitchItemCard(
+                      context,
+                      const Furniture(
+                        id: '6',
+                        name: 'Camera Decor',
+                        category: 'Office',
+                        glbPath: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/AntiqueCamera/glTF-Binary/AntiqueCamera.glb',
+                      ),
+                      selected,
+                    ),
                   ],
                 ),
               ),

@@ -42,6 +42,18 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
           category: 'Bedroom',
           glbPath: 'assets/models/lamp.glb',
         ),
+        const Furniture(
+          id: '5',
+          name: 'Designer Sheen Chair',
+          category: 'Living Room',
+          glbPath: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/SheenChair/glTF-Binary/SheenChair.glb',
+        ),
+        const Furniture(
+          id: '6',
+          name: 'Antique Decor Camera',
+          category: 'Office',
+          glbPath: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/AntiqueCamera/glTF-Binary/AntiqueCamera.glb',
+        ),
       ];
 
       emit(DashboardLoaded(mockFurniture));
