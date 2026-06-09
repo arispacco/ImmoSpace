@@ -1,0 +1,64 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate.log
+
+# IntelliJ Related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Visual Studio Code Related
+.vscode/
+
+# Flutter/Dart Related
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+
+# Android Related
+*.apk
+*.ap_
+*.asec
+*.code
+*.dex
+*.dm
+*.ext
+*.flat
+*.idsig
+*.ipa
+*.jar
+*.keystore
+*.odex
+*.prof
+*.profman
+*.properties
+*.src
+.gradle/
+local.properties
+
+# iOS/macOS Related
+*.mode1v3
+*.mode2v3
+*.nib
+*.pbxuser
+*.perspectivev3
+*.xcworkspace
+!default.xcworkspace
+DerivedData/
+Podfile.lock
+Pods/
+ServiceDefinitions.json
+rcg.h

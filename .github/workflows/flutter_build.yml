@@ -1,0 +1,80 @@
+name: Flutter CI/CD Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java Development Kit (JDK)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: immospace-android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  build-ios:
+    name: Build iOS IPA (Unsigned)
+    runs-on: macos-13
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build iOS Runner (Unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package Unsigned IPA
+        run: |
+          mkdir -p Payload
+          mv build/ios/iphoneos/Runner.app Payload/
+          zip -r Runner.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: immospace-ios-unsigned-ipa
+          path: Runner.ipa
+          if-no-files-found: error
+          retention-days: 7
