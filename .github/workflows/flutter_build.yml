@@ -17,19 +17,25 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Java Development Kit (JDK)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-          cache: 'gradle'
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: Generate Platforms
+        run: flutter create --org com.immospace --project-name immospace --platforms android,ios .
+
+      - name: Patch Platform Configurations
+        run: python scripts/patch_platforms.py
+
+      - name: Set up Java Development Kit (JDK)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
 
       - name: Get Dependencies
         run: flutter pub get
@@ -58,6 +64,12 @@ jobs:
           channel: 'stable'
           cache: true
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: Generate Platforms
+        run: flutter create --org com.immospace --project-name immospace --platforms android,ios .
+
+      - name: Patch Platform Configurations
+        run: python scripts/patch_platforms.py
 
       - name: Get Dependencies
         run: flutter pub get
