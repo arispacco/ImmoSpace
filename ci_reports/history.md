@@ -9,6 +9,8 @@
 - Patched Android plugin Gradle files for Kotlin/Java JVM target mismatches.
 - Patched legacy Android support-library conflicts by excluding `com.android.support`.
 - Patched `permission_handler_android` Flutter v1 embedding references pulled by old transitive dependencies.
+- Switched generated Android ARCore manifest entries to optional (`android.hardware.camera.ar` required=false, `com.google.ar.core` value=optional) to avoid Sceneform manifest merge conflicts while keeping the simulation fallback available.
+- Improved CI report extraction so Android manifest merger errors and Flutter analyzer diagnostics include context lines and probable causes.
 
 ## 2026-06-10 07:34:15 UTC - run 10
 - Commit: e5d48b658d5854d7806e93ff681ba6e44866a776

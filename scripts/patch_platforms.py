@@ -170,7 +170,7 @@ def patch_android():
     manifest_entries = [
         '    <uses-permission android:name="android.permission.CAMERA" />',
         '    <uses-permission android:name="android.permission.INTERNET" />',
-        '    <uses-feature android:name="android.hardware.camera.ar" android:required="true" />',
+        '    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />',
     ]
     missing_entries = [
         entry for entry in manifest_entries
@@ -178,15 +178,23 @@ def patch_android():
     ]
     if missing_entries:
         content = content.replace('<application', '\n'.join(missing_entries) + '\n    <application')
+    content = content.replace(
+        '<uses-feature android:name="android.hardware.camera.ar" android:required="true" />',
+        '<uses-feature android:name="android.hardware.camera.ar" android:required="false" />',
+    )
     
     # 2. Add meta-data inside <application>
     meta_data = """
-        <meta-data android:name="com.google.ar.core" android:value="required" />
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
 """
     if 'com.google.ar.core' not in content:
         app_start = content.find('<application')
         closing_bracket = content.find('>', app_start)
         content = content[:closing_bracket + 1] + meta_data + content[closing_bracket + 1:]
+    content = content.replace(
+        '<meta-data android:name="com.google.ar.core" android:value="required" />',
+        '<meta-data android:name="com.google.ar.core" android:value="optional" />',
+    )
         
     with open(manifest_path, 'w') as f:
         f.write(content)

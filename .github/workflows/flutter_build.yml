@@ -286,6 +286,14 @@ jobs:
               echo "- Legacy Android support libraries are mixed with AndroidX dependencies."
               matched=1
             fi
+            if grep -q "processReleaseMainManifest\|Manifest merger failed\|AndroidManifest.xml Error" "${file}"; then
+              echo "- Android manifest merger failed. Check ARCore/Sceneform manifest attributes, permissions, features, or meta-data conflicts."
+              matched=1
+            fi
+            if grep -q "com.google.ar.core\|android.hardware.camera.ar\|com.google.ar.sceneform" "${file}"; then
+              echo "- ARCore/Sceneform manifest entries are involved in the failure."
+              matched=1
+            fi
             if grep -q "Inconsistent JVM Target Compatibility" "${file}"; then
               echo "- Java and Kotlin Gradle tasks target different JVM versions."
               matched=1
@@ -302,6 +310,10 @@ jobs:
               echo "- Failure is inside an Android native plugin compilation task."
               matched=1
             fi
+            if grep -q "^[[:space:]]*info[[:space:]]*-\|^[[:space:]]*warning[[:space:]]*-\|^[[:space:]]*error[[:space:]]*-" "${file}"; then
+              echo "- Flutter analyze reported Dart analyzer diagnostics."
+              matched=1
+            fi
             if [ "${matched}" -eq 0 ]; then
               echo "- No known pattern detected yet. Inspect the key log lines below."
             fi
@@ -313,7 +325,7 @@ jobs:
               echo "No log file found."
               return
             fi
-            grep -nE "FAILURE:|What went wrong|Execution failed|error:|Error:|Duplicate class|Inconsistent JVM|cannot find symbol|Exception|Target .* failed|BUILD FAILED|BUILD SUCCESSFUL" "${file}" | tail -n 100 || true
+            grep -nE -A6 -B3 "FAILURE:|What went wrong|Execution failed|error:|Error:|Duplicate class|Inconsistent JVM|cannot find symbol|Exception|Target .* failed|BUILD FAILED|BUILD SUCCESSFUL|Manifest merger failed|AndroidManifest.xml Error|processReleaseMainManifest|com.google.ar.core|android.hardware.camera.ar|com.google.ar.sceneform|^[[:space:]]*info[[:space:]]*-|^[[:space:]]*warning[[:space:]]*-|^[[:space:]]*error[[:space:]]*-" "${file}" | tail -n 160 || true
           }
 
           section() {
