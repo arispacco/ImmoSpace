@@ -111,6 +111,16 @@ def fix_ar_flutter_plugin():
         content = content.replace('$ext.kotlin_version', '1.8.0')
         content = content.replace('${project.ext.kotlin_version}', '1.8.0')
         content = content.replace('project.ext.kotlin_version', '"1.8.0"')
+        content = content.replace('$kotlin_version', '1.8.0')
+        
+        # Add namespace to android block
+        if 'namespace' not in content:
+            content = content.replace('android {', 'android {\n    namespace "io.carius.lars.ar_flutter_plugin"')
+            
+        # Remove obsolete afterEvaluate block that causes 'configurations.all' error in Gradle 8+
+        after_eval_start = content.find('afterEvaluate {')
+        if after_eval_start != -1:
+            content = content[:after_eval_start]
         
         with open(path, 'w') as f:
             f.write(content)
