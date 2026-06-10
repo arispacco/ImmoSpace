@@ -1,4 +1,5 @@
 import os
+import glob
 
 def patch_android():
     manifest_path = 'android/app/src/main/AndroidManifest.xml'
@@ -29,13 +30,12 @@ def patch_android():
     with open(manifest_path, 'w') as f:
         f.write(content)
         
-    # 3. Patch build.gradle to minSdkVersion 24
+    # 3. Patch build.gradle to minSdkVersion 24 (Groovy)
     gradle_path = 'android/app/build.gradle'
     if os.path.exists(gradle_path):
         with open(gradle_path, 'r') as f:
             gradle_content = f.read()
         
-        # Replace default flutter.minSdkVersion with 24
         gradle_content = gradle_content.replace('flutter.minSdkVersion', '24')
         gradle_content = gradle_content.replace('minSdkVersion 16', 'minSdkVersion 24')
         gradle_content = gradle_content.replace('minSdkVersion 19', 'minSdkVersion 24')
@@ -44,6 +44,17 @@ def patch_android():
         
         with open(gradle_path, 'w') as f:
             f.write(gradle_content)
+
+    # 4. Patch build.gradle.kts to minSdkVersion 24 (Kotlin DSL)
+    kts_path = 'android/app/build.gradle.kts'
+    if os.path.exists(kts_path):
+        with open(kts_path, 'r') as f:
+            kts_content = f.read()
+            
+        kts_content = kts_content.replace('flutter.minSdkVersion', '24')
+        
+        with open(kts_path, 'w') as f:
+            f.write(kts_content)
             
     print("Android platform files patched successfully.")
 
@@ -75,6 +86,36 @@ def patch_ios():
         
     print("iOS platform files patched successfully.")
 
+def fix_ar_flutter_plugin():
+    # Find the ar_flutter_plugin in pub cache and patch its gradle file to fix build errors
+    home_dir = os.path.expanduser('~')
+    # Can be in PUB_CACHE environment variable or ~/.pub-cache
+    pub_cache = os.environ.get('PUB_CACHE', os.path.join(home_dir, '.pub-cache'))
+    
+    search_pattern = os.path.join(pub_cache, 'hosted', 'pub.dev', 'ar_flutter_plugin-*', 'android', 'build.gradle')
+    matches = glob.glob(search_pattern)
+    
+    if not matches:
+        print(f"Could not find ar_flutter_plugin in {search_pattern}")
+        return
+        
+    for path in matches:
+        print(f"Patching plugin at {path}")
+        with open(path, 'r') as f:
+            content = f.read()
+            
+        # Fix jcenter() removal
+        content = content.replace('jcenter()', 'mavenCentral()')
+        
+        # Fix NullPointerException caused by missing ext.kotlin_version in root project
+        content = content.replace('$ext.kotlin_version', '1.8.0')
+        content = content.replace('${project.ext.kotlin_version}', '1.8.0')
+        content = content.replace('project.ext.kotlin_version', '"1.8.0"')
+        
+        with open(path, 'w') as f:
+            f.write(content)
+
 if __name__ == '__main__':
+    fix_ar_flutter_plugin()
     patch_android()
     patch_ios()
