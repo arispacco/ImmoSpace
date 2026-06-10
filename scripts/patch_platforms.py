@@ -1,6 +1,52 @@
 import os
 import glob
 
+KOTLIN_JVM_TARGET_PATCH = """
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+}
+"""
+
+ANDROID_COMPILE_OPTIONS_PATCH = """
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+"""
+
+ANDROID_KOTLIN_OPTIONS_PATCH = """
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+"""
+
+def add_to_android_block(content, patch, marker):
+    if marker in content or 'android {' not in content:
+        return content
+
+    insert_pos = content.find('android {') + len('android {')
+    return content[:insert_pos] + patch + content[insert_pos:]
+
+def align_kotlin_jvm_target(content):
+    has_kotlin = (
+        'kotlin-android' in content or
+        'org.jetbrains.kotlin.android' in content or
+        'KotlinCompile' in content
+    )
+    if not has_kotlin:
+        return content
+
+    content = add_to_android_block(content, ANDROID_COMPILE_OPTIONS_PATCH, 'sourceCompatibility JavaVersion.VERSION_11')
+    content = add_to_android_block(content, ANDROID_KOTLIN_OPTIONS_PATCH, "jvmTarget = '11'")
+
+    if 'tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile)' not in content:
+        content += KOTLIN_JVM_TARGET_PATCH
+
+    return content
+
 def patch_android():
     manifest_path = 'android/app/src/main/AndroidManifest.xml'
     if not os.path.exists(manifest_path):
@@ -126,11 +172,32 @@ def fix_ar_flutter_plugin():
         after_eval_start = content.find('afterEvaluate {')
         if after_eval_start != -1:
             content = content[:after_eval_start]
+
+        content = align_kotlin_jvm_target(content)
         
         with open(path, 'w') as f:
             f.write(content)
 
+def fix_pub_cache_kotlin_plugins():
+    # Flutter 3.44/Gradle now fails when Java and Kotlin tasks target different JVMs.
+    # Patch Kotlin-based Android plugins in the pub cache so their Java/Kotlin targets match.
+    home_dir = os.path.expanduser('~')
+    pub_cache = os.environ.get('PUB_CACHE', os.path.join(home_dir, '.pub-cache'))
+    search_pattern = os.path.join(pub_cache, 'hosted', 'pub.dev', '*', 'android', 'build.gradle')
+    matches = glob.glob(search_pattern)
+
+    for path in matches:
+        with open(path, 'r') as f:
+            content = f.read()
+
+        patched = align_kotlin_jvm_target(content)
+        if patched != content:
+            print(f"Aligning Kotlin JVM target at {path}")
+            with open(path, 'w') as f:
+                f.write(patched)
+
 if __name__ == '__main__':
     fix_ar_flutter_plugin()
+    fix_pub_cache_kotlin_plugins()
     patch_android()
     patch_ios()
