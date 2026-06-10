@@ -52,7 +52,7 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
   final List<ARAnchor> _placedAnchors = [];
 
   // Local state for checking simulator fallback
-  bool _useSimulationFallback = false;
+  bool _useSimulationFallback = true;
 
   // Spatial controls state
   double _rotationAngle = 0.0; // in degrees (0 - 360)

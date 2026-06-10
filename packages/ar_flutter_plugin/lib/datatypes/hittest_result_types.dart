@@ -1,0 +1,4 @@
+enum ARHitTestResultType {
+  plane,
+  point,
+}

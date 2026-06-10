@@ -1,0 +1,15 @@
+name: ar_flutter_plugin
+description: Local ImmoSpace AR compatibility adapter used for CI-safe simulated AR placement.
+publish_to: 'none'
+version: 0.7.3
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  vector_math: ^2.1.4
+
+flutter:
+  uses-material-design: true
