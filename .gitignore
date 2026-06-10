@@ -27,6 +27,7 @@ migrate.log
 .pub-cache/
 .pub/
 /build/
+ci_reports/raw/
 
 # Android Related
 *.apk

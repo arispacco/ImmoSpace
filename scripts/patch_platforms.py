@@ -138,6 +138,25 @@ def remove_java_method(content, signature):
 
     return content
 
+def remove_permission_handler_registrar_branches(content):
+    content = re.sub(
+        r'\s*if\s*\(\s*this\.pluginRegistrar\s*!=\s*null\s*\)\s*\{\s*'
+        r'this\.pluginRegistrar\.addActivityResultListener\(this\.permissionManager\);\s*'
+        r'this\.pluginRegistrar\.addRequestPermissionsResultListener\(this\.permissionManager\);\s*'
+        r'\}\s*else\s*',
+        '\n        ',
+        content,
+    )
+    content = re.sub(
+        r'\s*if\s*\(\s*this\.pluginRegistrar\s*!=\s*null\s*\)\s*\{\s*'
+        r'this\.pluginRegistrar\.removeActivityResultListener\(this\.permissionManager\);\s*'
+        r'this\.pluginRegistrar\.removeRequestPermissionsResultListener\(this\.permissionManager\);\s*'
+        r'\}\s*else\s*',
+        '\n        ',
+        content,
+    )
+    return content
+
 def patch_android():
     manifest_path = 'android/app/src/main/AndroidManifest.xml'
     if not os.path.exists(manifest_path):
@@ -306,6 +325,7 @@ def fix_permission_handler_android():
             content,
             'public static void registerWith(io.flutter.plugin.common.PluginRegistry.Registrar registrar)',
         )
+        patched = remove_permission_handler_registrar_branches(patched)
         patched = patched.replace(
             'io.flutter.plugin.common.PluginRegistry.Registrar',
             'Object',

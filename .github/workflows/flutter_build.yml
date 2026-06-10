@@ -9,7 +9,67 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.1'
+
 jobs:
+  analyze:
+    name: Flutter Analyze
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: Generate Platforms
+        run: flutter create --org com.immospace --project-name immospace --platforms android,ios .
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Patch Platform Configurations
+        run: python3 scripts/patch_platforms.py
+
+      - name: Run Flutter Analyze
+        id: flutter_analyze
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p ci_reports
+          set +e
+          flutter analyze 2>&1 | tee ci_reports/flutter_analyze.log
+          status=${PIPESTATUS[0]}
+          echo "${status}" > ci_reports/flutter_analyze.exitcode
+          exit "${status}"
+
+      - name: Upload Analyze Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-report-analyze
+          path: |
+            ci_reports/flutter_analyze.log
+            ci_reports/flutter_analyze.exitcode
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail If Analyze Failed
+        if: always()
+        shell: bash
+        run: |
+          status="$(cat ci_reports/flutter_analyze.exitcode 2>/dev/null || echo 1)"
+          exit "${status}"
+
   build-android:
     name: Build Android APK
     runs-on: ubuntu-24.04
@@ -20,7 +80,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.1'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
           cache: true
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
@@ -42,15 +102,43 @@ jobs:
           cache: 'gradle'
 
       - name: Build Release APK
-        run: flutter build apk --release
+        id: android_build
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p ci_reports
+          set +e
+          flutter build apk --release 2>&1 | tee ci_reports/android_build.log
+          status=${PIPESTATUS[0]}
+          echo "${status}" > ci_reports/android_build.exitcode
+          exit "${status}"
 
       - name: Upload APK Artifact
+        if: steps.android_build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: immospace-android-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload Android Build Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-report-android
+          path: |
+            ci_reports/android_build.log
+            ci_reports/android_build.exitcode
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail If Android Build Failed
+        if: always()
+        shell: bash
+        run: |
+          status="$(cat ci_reports/android_build.exitcode 2>/dev/null || echo 1)"
+          exit "${status}"
 
   build-ios:
     name: Build iOS IPA (Unsigned)
@@ -62,7 +150,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.1'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
           cache: true
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
@@ -77,18 +165,246 @@ jobs:
         run: python3 scripts/patch_platforms.py
 
       - name: Build iOS Runner (Unsigned)
-        run: flutter build ios --release --no-codesign
+        id: ios_build
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p ci_reports
+          set +e
+          flutter build ios --release --no-codesign 2>&1 | tee ci_reports/ios_build.log
+          status=${PIPESTATUS[0]}
+          echo "${status}" > ci_reports/ios_build.exitcode
+          exit "${status}"
 
       - name: Package Unsigned IPA
+        if: steps.ios_build.outcome == 'success'
+        shell: bash
         run: |
           mkdir -p Payload
           mv build/ios/iphoneos/Runner.app Payload/
           zip -r Runner.ipa Payload
 
       - name: Upload IPA Artifact
+        if: steps.ios_build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: immospace-ios-unsigned-ipa
           path: Runner.ipa
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload iOS Build Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-report-ios
+          path: |
+            ci_reports/ios_build.log
+            ci_reports/ios_build.exitcode
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail If iOS Build Failed
+        if: always()
+        shell: bash
+        run: |
+          status="$(cat ci_reports/ios_build.exitcode 2>/dev/null || echo 1)"
+          exit "${status}"
+
+  publish-ci-report:
+    name: Publish CI Diagnostic Report
+    runs-on: ubuntu-24.04
+    needs:
+      - analyze
+      - build-android
+      - build-ios
+    if: always()
+    steps:
+      - name: Checkout Repository
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Checkout Repository For Pull Request
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+
+      - name: Download CI Report Artifacts
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ci-report-*
+          path: ci_reports/raw
+
+      - name: Compose Diagnostic Report
+        if: always()
+        shell: bash
+        env:
+          ANALYZE_RESULT: ${{ needs.analyze.result }}
+          ANDROID_RESULT: ${{ needs['build-android'].result }}
+          IOS_RESULT: ${{ needs['build-ios'].result }}
+        run: |
+          set +e
+          mkdir -p ci_reports/logs
+
+          copy_tail() {
+            src="$1"
+            dest="$2"
+            if [ -f "${src}" ]; then
+              tail -n 300 "${src}" > "ci_reports/logs/${dest}"
+            else
+              printf 'Log not available: %s\n' "${src}" > "ci_reports/logs/${dest}"
+            fi
+          }
+
+          exit_code() {
+            file="$1"
+            if [ -f "${file}" ]; then
+              cat "${file}"
+            else
+              echo "unknown"
+            fi
+          }
+
+          causes() {
+            file="$1"
+            matched=0
+            if [ ! -f "${file}" ]; then
+              echo "- Log missing: the job probably failed before the command was captured."
+              return
+            fi
+            if grep -q "PluginRegistry\.Registrar\|v1 embedding" "${file}"; then
+              echo "- Android plugin still references the removed Flutter v1 embedding."
+              matched=1
+            fi
+            if grep -q "addActivityResultListener\|addRequestPermissionsResultListener" "${file}"; then
+              echo "- permission_handler_android still has v1 Registrar listener code in its Java source."
+              matched=1
+            fi
+            if grep -q "Duplicate class android.support\|com.android.support:support-compat" "${file}"; then
+              echo "- Legacy Android support libraries are mixed with AndroidX dependencies."
+              matched=1
+            fi
+            if grep -q "Inconsistent JVM Target Compatibility" "${file}"; then
+              echo "- Java and Kotlin Gradle tasks target different JVM versions."
+              matched=1
+            fi
+            if grep -q "Error when reading .*No such file" "${file}"; then
+              echo "- A Dart import points to a missing file or a wrong relative path."
+              matched=1
+            fi
+            if grep -q "No named parameter\|getter .* isn't defined\|method .* isn't defined\|argument type" "${file}"; then
+              echo "- Dart code uses an API signature that does not match the resolved package or Flutter version."
+              matched=1
+            fi
+            if grep -q "compileReleaseKotlin\|compileReleaseJavaWithJavac" "${file}"; then
+              echo "- Failure is inside an Android native plugin compilation task."
+              matched=1
+            fi
+            if [ "${matched}" -eq 0 ]; then
+              echo "- No known pattern detected yet. Inspect the key log lines below."
+            fi
+          }
+
+          key_lines() {
+            file="$1"
+            if [ ! -f "${file}" ]; then
+              echo "No log file found."
+              return
+            fi
+            grep -nE "FAILURE:|What went wrong|Execution failed|error:|Error:|Duplicate class|Inconsistent JVM|cannot find symbol|Exception|Target .* failed|BUILD FAILED|BUILD SUCCESSFUL" "${file}" | tail -n 100 || true
+          }
+
+          section() {
+            title="$1"
+            result="$2"
+            log="$3"
+            code_file="$4"
+            tail_file="$5"
+            {
+              echo "## ${title}"
+              echo "- Job result: ${result}"
+              echo "- Command exit code: $(exit_code "${code_file}")"
+              echo ""
+              echo "### Probable causes"
+              causes "${log}"
+              echo ""
+              echo "### Key log lines"
+              echo '```text'
+              key_lines "${log}"
+              echo '```'
+              echo ""
+              echo "### Last 300 log lines"
+              echo "See ci_reports/logs/${tail_file} after pulling the report commit."
+              echo ""
+            } >> ci_reports/latest.md
+          }
+
+          analyze_log="ci_reports/raw/ci-report-analyze/flutter_analyze.log"
+          analyze_code="ci_reports/raw/ci-report-analyze/flutter_analyze.exitcode"
+          android_log="ci_reports/raw/ci-report-android/android_build.log"
+          android_code="ci_reports/raw/ci-report-android/android_build.exitcode"
+          ios_log="ci_reports/raw/ci-report-ios/ios_build.log"
+          ios_code="ci_reports/raw/ci-report-ios/ios_build.exitcode"
+
+          copy_tail "${analyze_log}" flutter_analyze_tail.log
+          copy_tail "${android_log}" android_build_tail.log
+          copy_tail "${ios_log}" ios_build_tail.log
+
+          {
+            echo "# CI Diagnostic Report"
+            echo ""
+            echo "- Workflow: ${GITHUB_WORKFLOW}"
+            echo "- Run: ${GITHUB_RUN_NUMBER} (${GITHUB_RUN_ID})"
+            echo "- Branch: ${GITHUB_REF_NAME}"
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "- Flutter: ${FLUTTER_VERSION}"
+            echo ""
+          } > ci_reports/latest.md
+
+          section "Flutter analyze" "${ANALYZE_RESULT}" "${analyze_log}" "${analyze_code}" flutter_analyze_tail.log
+          section "Android release APK" "${ANDROID_RESULT}" "${android_log}" "${android_code}" android_build_tail.log
+          section "iOS unsigned build" "${IOS_RESULT}" "${ios_log}" "${ios_code}" ios_build_tail.log
+
+          {
+            echo ""
+            echo "## $(date -u '+%Y-%m-%d %H:%M:%S UTC') - run ${GITHUB_RUN_NUMBER}"
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Analyze: ${ANALYZE_RESULT}, exit $(exit_code "${analyze_code}")"
+            echo "- Android: ${ANDROID_RESULT}, exit $(exit_code "${android_code}")"
+            echo "- iOS: ${IOS_RESULT}, exit $(exit_code "${ios_code}")"
+            echo "- Main report: ci_reports/latest.md"
+            echo "- Android probable causes:"
+            causes "${android_log}" | sed 's/^/  /'
+          } >> ci_reports/history.md
+
+          cat ci_reports/latest.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload Combined CI Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-report-latest
+          path: |
+            ci_reports/latest.md
+            ci_reports/history.md
+            ci_reports/logs/*.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Commit CI Report
+        if: always() && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci_reports/latest.md ci_reports/history.md ci_reports/logs
+          if git diff --cached --quiet; then
+            echo "No CI report changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(ci): update diagnostic report [skip ci]"
+          git pull --rebase origin "${GITHUB_REF_NAME}" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}"
