@@ -1,5 +1,6 @@
 import os
 import glob
+import re
 
 KOTLIN_JVM_TARGET_PATCH = """
 
@@ -30,6 +31,37 @@ def add_to_android_block(content, patch, marker):
     insert_pos = content.find('android {') + len('android {')
     return content[:insert_pos] + patch + content[insert_pos:]
 
+def force_java_11_compile_options(content):
+    content = re.sub(
+        r'sourceCompatibility\s+JavaVersion\.VERSION_(?:1_)?8',
+        'sourceCompatibility JavaVersion.VERSION_11',
+        content,
+    )
+    content = re.sub(
+        r'targetCompatibility\s+JavaVersion\.VERSION_(?:1_)?8',
+        'targetCompatibility JavaVersion.VERSION_11',
+        content,
+    )
+    content = re.sub(
+        r'sourceCompatibility\s*=\s*JavaVersion\.VERSION_(?:1_)?8',
+        'sourceCompatibility = JavaVersion.VERSION_11',
+        content,
+    )
+    content = re.sub(
+        r'targetCompatibility\s*=\s*JavaVersion\.VERSION_(?:1_)?8',
+        'targetCompatibility = JavaVersion.VERSION_11',
+        content,
+    )
+    return content
+
+def force_kotlin_11_options(content):
+    content = re.sub(
+        r'jvmTarget\s*=\s*["\'](?:1\.)?8["\']',
+        "jvmTarget = '11'",
+        content,
+    )
+    return content
+
 def align_kotlin_jvm_target(content):
     has_kotlin = (
         'kotlin-android' in content or
@@ -39,6 +71,8 @@ def align_kotlin_jvm_target(content):
     if not has_kotlin:
         return content
 
+    content = force_java_11_compile_options(content)
+    content = force_kotlin_11_options(content)
     content = add_to_android_block(content, ANDROID_COMPILE_OPTIONS_PATCH, 'sourceCompatibility JavaVersion.VERSION_11')
     content = add_to_android_block(content, ANDROID_KOTLIN_OPTIONS_PATCH, "jvmTarget = '11'")
 
