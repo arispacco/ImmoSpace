@@ -27,8 +27,11 @@ jobs:
       - name: Generate Platforms
         run: flutter create --org com.immospace --project-name immospace --platforms android,ios .
 
+      - name: Get Dependencies
+        run: flutter pub get
+
       - name: Patch Platform Configurations
-        run: python scripts/patch_platforms.py
+        run: python3 scripts/patch_platforms.py
 
       - name: Set up Java Development Kit (JDK)
         uses: actions/setup-java@v4
@@ -36,9 +39,6 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
           cache: 'gradle'
-
-      - name: Get Dependencies
-        run: flutter pub get
 
       - name: Build Release APK
         run: flutter build apk --release
@@ -68,11 +68,11 @@ jobs:
       - name: Generate Platforms
         run: flutter create --org com.immospace --project-name immospace --platforms android,ios .
 
-      - name: Patch Platform Configurations
-        run: python scripts/patch_platforms.py
-
       - name: Get Dependencies
         run: flutter pub get
+
+      - name: Patch Platform Configurations
+        run: python3 scripts/patch_platforms.py
 
       - name: Build iOS Runner (Unsigned)
         run: flutter build ios --release --no-codesign
