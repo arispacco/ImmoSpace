@@ -20,3 +20,13 @@
 - Main report: ci_reports/latest.md
 - Android probable causes:
   - No known pattern detected yet. Inspect the key log lines below.
+
+## 2026-06-10 07:58:19 UTC - run 11
+- Commit: f2f69c5a1db02fd8372a1dc95ef5bdbb074c0827
+- Analyze: failure, exit 1
+- Android: failure, exit 1
+- iOS: success, exit 0
+- Main report: ci_reports/latest.md
+- Android probable causes:
+  - Android manifest merger failed. Check ARCore/Sceneform manifest attributes, permissions, features, or meta-data conflicts.
+  - ARCore/Sceneform manifest entries are involved in the failure.
