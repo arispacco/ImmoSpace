@@ -32,3 +32,12 @@
 - Android probable causes:
   - Android manifest merger failed. Check ARCore/Sceneform manifest attributes, permissions, features, or meta-data conflicts.
   - ARCore/Sceneform manifest entries are involved in the failure.
+
+## 2026-06-10 21:52:45 UTC - run 13
+- Commit: 8744b754ad85f28b397755b3be4c6391af6421ec
+- Analyze: failure, exit 1
+- Android: success, exit 0
+- iOS: success, exit 0
+- Main report: ci_reports/latest.md
+- Android probable causes:
+  - No known pattern detected yet. Inspect the key log lines below.
