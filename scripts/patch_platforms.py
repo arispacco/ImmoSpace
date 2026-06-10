@@ -24,12 +24,31 @@ ANDROID_KOTLIN_OPTIONS_PATCH = """
     }
 """
 
+LEGACY_SUPPORT_EXCLUDE_GROOVY = """
+
+configurations.all {
+    exclude group: 'com.android.support'
+}
+"""
+
+LEGACY_SUPPORT_EXCLUDE_KTS = """
+
+configurations.all {
+    exclude(group = "com.android.support")
+}
+"""
+
 def add_to_android_block(content, patch, marker):
     if marker in content or 'android {' not in content:
         return content
 
     insert_pos = content.find('android {') + len('android {')
     return content[:insert_pos] + patch + content[insert_pos:]
+
+def add_top_level_patch(content, patch, marker):
+    if marker in content:
+        return content
+    return content.rstrip() + patch + '\n'
 
 def force_java_11_compile_options(content):
     content = re.sub(
@@ -81,6 +100,44 @@ def align_kotlin_jvm_target(content):
 
     return content
 
+def exclude_legacy_support_dependencies(content):
+    return add_top_level_patch(
+        content,
+        LEGACY_SUPPORT_EXCLUDE_GROOVY,
+        "exclude group: 'com.android.support'",
+    )
+
+def exclude_legacy_support_dependencies_kts(content):
+    return add_top_level_patch(
+        content,
+        LEGACY_SUPPORT_EXCLUDE_KTS,
+        'exclude(group = "com.android.support")',
+    )
+
+def remove_java_method(content, signature):
+    start = content.find(signature)
+    if start == -1:
+        return content
+
+    brace_start = content.find('{', start)
+    if brace_start == -1:
+        return content
+
+    depth = 0
+    for index in range(brace_start, len(content)):
+        if content[index] == '{':
+            depth += 1
+        elif content[index] == '}':
+            depth -= 1
+            if depth == 0:
+                end = index + 1
+                while end < len(content) and content[end] in '\r\n':
+                    end += 1
+                line_start = content.rfind('\n', 0, start) + 1
+                return content[:line_start] + content[end:]
+
+    return content
+
 def patch_android():
     manifest_path = 'android/app/src/main/AndroidManifest.xml'
     if not os.path.exists(manifest_path):
@@ -126,6 +183,7 @@ def patch_android():
         gradle_content = gradle_content.replace('minSdkVersion 19', 'minSdkVersion 24')
         gradle_content = gradle_content.replace('minSdkVersion 20', 'minSdkVersion 24')
         gradle_content = gradle_content.replace('minSdkVersion 21', 'minSdkVersion 24')
+        gradle_content = exclude_legacy_support_dependencies(gradle_content)
         
         with open(gradle_path, 'w') as f:
             f.write(gradle_content)
@@ -137,6 +195,7 @@ def patch_android():
             kts_content = f.read()
             
         kts_content = kts_content.replace('flutter.minSdkVersion', '24')
+        kts_content = exclude_legacy_support_dependencies_kts(kts_content)
         
         with open(kts_path, 'w') as f:
             f.write(kts_content)
@@ -208,13 +267,59 @@ def fix_ar_flutter_plugin():
             content = content[:after_eval_start]
 
         content = align_kotlin_jvm_target(content)
+        content = exclude_legacy_support_dependencies(content)
         
         with open(path, 'w') as f:
             f.write(content)
 
-def fix_pub_cache_kotlin_plugins():
+def fix_permission_handler_android():
+    # permission_handler_android 10.3.6 still contains the removed Flutter v1
+    # embedding registerWith(Registrar) hook. Flutter 3.44 no longer exposes
+    # PluginRegistry.Registrar, so keep only the v2 embedding implementation.
+    home_dir = os.path.expanduser('~')
+    pub_cache = os.environ.get('PUB_CACHE', os.path.join(home_dir, '.pub-cache'))
+    search_pattern = os.path.join(
+        pub_cache,
+        'hosted',
+        'pub.dev',
+        'permission_handler_android-*',
+        'android',
+        'src',
+        'main',
+        'java',
+        'com',
+        'baseflow',
+        'permissionhandler',
+        'PermissionHandlerPlugin.java',
+    )
+    matches = glob.glob(search_pattern)
+
+    if not matches:
+        print(f"Could not find permission_handler_android in {search_pattern}")
+        return
+
+    for path in matches:
+        with open(path, 'r') as f:
+            content = f.read()
+
+        patched = remove_java_method(
+            content,
+            'public static void registerWith(io.flutter.plugin.common.PluginRegistry.Registrar registrar)',
+        )
+        patched = patched.replace(
+            'io.flutter.plugin.common.PluginRegistry.Registrar',
+            'Object',
+        )
+
+        if patched != content:
+            print(f"Removing Flutter v1 embedding hook from {path}")
+            with open(path, 'w') as f:
+                f.write(patched)
+
+def fix_pub_cache_android_plugins():
     # Flutter 3.44/Gradle now fails when Java and Kotlin tasks target different JVMs.
-    # Patch Kotlin-based Android plugins in the pub cache so their Java/Kotlin targets match.
+    # Patch Android plugins in the pub cache so their Java/Kotlin targets match and old
+    # support-library artifacts do not conflict with AndroidX.
     home_dir = os.path.expanduser('~')
     pub_cache = os.environ.get('PUB_CACHE', os.path.join(home_dir, '.pub-cache'))
     search_pattern = os.path.join(pub_cache, 'hosted', 'pub.dev', '*', 'android', 'build.gradle')
@@ -225,13 +330,15 @@ def fix_pub_cache_kotlin_plugins():
             content = f.read()
 
         patched = align_kotlin_jvm_target(content)
+        patched = exclude_legacy_support_dependencies(patched)
         if patched != content:
-            print(f"Aligning Kotlin JVM target at {path}")
+            print(f"Patching Android plugin Gradle config at {path}")
             with open(path, 'w') as f:
                 f.write(patched)
 
 if __name__ == '__main__':
     fix_ar_flutter_plugin()
-    fix_pub_cache_kotlin_plugins()
+    fix_permission_handler_android()
+    fix_pub_cache_android_plugins()
     patch_android()
     patch_ios()
