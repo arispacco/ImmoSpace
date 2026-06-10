@@ -144,7 +144,7 @@ class IntegrityVerifier {
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white05, width: 1),
+                      border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
                     ),
                     child: Column(
                       children: [

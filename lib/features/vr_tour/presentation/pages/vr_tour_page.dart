@@ -6,9 +6,9 @@ import '../bloc/vr_tour_bloc.dart';
 import '../bloc/vr_tour_event.dart';
 import '../bloc/vr_tour_state.dart';
 import '../../domain/entities/vr_room.dart';
-import '../../../core/presentation/widgets/glass_container.dart';
+import '../../../../core/presentation/widgets/glass_container.dart';
 import '../widgets/pulsing_hotspot.dart';
-import '../../../core/utils/battery_optimizer.dart';
+import '../../../../core/utils/battery_optimizer.dart';
 
 class VRTourPage extends StatefulWidget {
   const VRTourPage({super.key});

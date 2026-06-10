@@ -10,13 +10,18 @@ def patch_android():
     with open(manifest_path, 'r') as f:
         content = f.read()
     
-    # 1. Add permissions inside <manifest>
-    permissions = """
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera.ar" android:required="true" />
-"""
-    if 'android.permission.CAMERA' not in content:
-        content = content.replace('<application', permissions + '    <application')
+    # 1. Add permissions/features inside <manifest>
+    manifest_entries = [
+        '    <uses-permission android:name="android.permission.CAMERA" />',
+        '    <uses-permission android:name="android.permission.INTERNET" />',
+        '    <uses-feature android:name="android.hardware.camera.ar" android:required="true" />',
+    ]
+    missing_entries = [
+        entry for entry in manifest_entries
+        if entry.split('android:name="', 1)[1].split('"', 1)[0] not in content
+    ]
+    if missing_entries:
+        content = content.replace('<application', '\n'.join(missing_entries) + '\n    <application')
     
     # 2. Add meta-data inside <application>
     meta_data = """

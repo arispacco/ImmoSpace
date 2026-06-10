@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/presentation/widgets/glass_container.dart';
+import '../../../../core/presentation/widgets/glass_container.dart';
 import '../../domain/entities/furniture.dart';
 
 class FurnitureDetailPage extends StatefulWidget {

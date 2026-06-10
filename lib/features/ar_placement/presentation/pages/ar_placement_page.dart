@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ar_flutter_plugin/ar_flutter_plugin.dart';
-import 'package:ar_flutter_plugin/datatypes/config_planhandling.dart';
+import 'package:ar_flutter_plugin/datatypes/config_planedetection.dart';
 import 'package:ar_flutter_plugin/managers/ar_anchor_manager.dart';
 import 'package:ar_flutter_plugin/managers/ar_location_manager.dart';
 import 'package:ar_flutter_plugin/managers/ar_object_manager.dart';
@@ -22,6 +22,15 @@ import '../../../dashboard/domain/entities/furniture.dart';
 import '../../../../core/presentation/widgets/glass_container.dart';
 import '../widgets/radar_scanner.dart';
 import '../../../../core/utils/battery_optimizer.dart';
+
+const String _sofaModelUrl =
+    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/GlamVelvetSofa/glTF-Binary/GlamVelvetSofa.glb';
+const String _chairModelUrl =
+    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ChairDamaskPurplegold/glTF-Binary/ChairDamaskPurplegold.glb';
+const String _tableModelUrl =
+    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ClearcoatWicker/glTF-Binary/ClearcoatWicker.glb';
+const String _lampModelUrl =
+    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/IridescenceLamp/glTF-Binary/IridescenceLamp.glb';
 
 class ARPlacementPage extends StatefulWidget {
   final Furniture? selectedFurniture;
@@ -93,7 +102,17 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
     final lastNode = _placedNodes.last;
     final rad = _rotationAngle * math.pi / 180.0;
     lastNode.scale = vector.Vector3(_scaleFactor * 0.5, _scaleFactor * 0.5, _scaleFactor * 0.5);
-    lastNode.rotation = vector.Vector4(0.0, 1.0, 0.0, rad);
+    lastNode.eulerAngles = vector.Vector3(0.0, rad, 0.0);
+  }
+
+  NodeType _nodeTypeForPath(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return NodeType.webGLB;
+    }
+    if (path.startsWith('assets/')) {
+      return NodeType.localGLTF2;
+    }
+    return NodeType.fileSystemAppFolderGLB;
   }
 
   @override
@@ -204,7 +223,6 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
     _arSessionManager!.onInitialize(
       showFeaturePoints: true,
       showPlanes: true,
-      customPlaneTexturePath: "assets/images/triangle.png",
       showWorldOrigin: false,
       handleTaps: true,
       handlePans: true,
@@ -224,29 +242,35 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
     final currentState = bloc.state;
 
     if (currentState is ARPlacementSuccess && currentState.selectedFurniture != null) {
-      final planeHit = hitTestResults.firstWhere(
-        (result) => result.type == ARHitTestResultType.plane,
-      );
+      ARHitTestResult? planeHit;
+      for (final result in hitTestResults) {
+        if (result.type == ARHitTestResultType.plane) {
+          planeHit = result;
+          break;
+        }
+      }
+      if (planeHit == null) return;
 
-      final anchor = ARPlaneAnchor(pose: planeHit.worldTransform);
+      final anchor = ARPlaneAnchor(transformation: planeHit.worldTransform);
       final didAddAnchor = await _arAnchorManager?.addAnchor(anchor);
 
       if (didAddAnchor == true) {
-        _placedAnchors.add(anchor);
-        bloc.add(PlaceFurnitureModel(anchor.name));
-
         final rad = _rotationAngle * math.pi / 180.0;
         final node = ARNode(
-          type: NodeType.localGLTF2,
+          type: _nodeTypeForPath(currentState.selectedFurniture!.glbPath),
           uri: currentState.selectedFurniture!.glbPath,
           scale: vector.Vector3(_scaleFactor * 0.5, _scaleFactor * 0.5, _scaleFactor * 0.5),
           position: vector.Vector3(0.0, 0.0, 0.0),
-          rotation: vector.Vector4(0.0, 1.0, 0.0, rad),
+          eulerAngles: vector.Vector3(0.0, rad, 0.0),
         );
 
         final didAddNode = await _arObjectManager?.addNode(node, planeAnchor: anchor);
         if (didAddNode == true) {
+          _placedAnchors.add(anchor);
           _placedNodes.add(node);
+          bloc.add(PlaceFurnitureModel(anchor.name));
+        } else {
+          _arAnchorManager?.removeAnchor(anchor);
         }
       }
     }
@@ -265,7 +289,11 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
             child: GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 10),
-              itemBuilder: (c, i) => Container(border: Border.all(color: Colors.white, width: 0.5)),
+              itemBuilder: (c, i) => Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white, width: 0.5),
+                ),
+              ),
             ),
           ),
           Column(
@@ -668,7 +696,7 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
                         id: '1',
                         name: 'Sofa',
                         category: 'Living Room',
-                        glbPath: 'assets/models/sofa.glb',
+                        glbPath: _sofaModelUrl,
                       ),
                       selected,
                     ),
@@ -678,7 +706,7 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
                         id: '2',
                         name: 'Chair',
                         category: 'Dining Room',
-                        glbPath: 'assets/models/chair.glb',
+                        glbPath: _chairModelUrl,
                       ),
                       selected,
                     ),
@@ -688,7 +716,7 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
                         id: '3',
                         name: 'Table',
                         category: 'Office',
-                        glbPath: 'assets/models/table.glb',
+                        glbPath: _tableModelUrl,
                       ),
                       selected,
                     ),
@@ -698,7 +726,7 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
                         id: '4',
                         name: 'Lamp',
                         category: 'Bedroom',
-                        glbPath: 'assets/models/lamp.glb',
+                        glbPath: _lampModelUrl,
                       ),
                       selected,
                     ),

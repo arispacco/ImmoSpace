@@ -4,6 +4,15 @@ import 'dashboard_event.dart';
 import 'dashboard_state.dart';
 
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
+  static const String _sofaModelUrl =
+      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/GlamVelvetSofa/glTF-Binary/GlamVelvetSofa.glb';
+  static const String _chairModelUrl =
+      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ChairDamaskPurplegold/glTF-Binary/ChairDamaskPurplegold.glb';
+  static const String _tableModelUrl =
+      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ClearcoatWicker/glTF-Binary/ClearcoatWicker.glb';
+  static const String _lampModelUrl =
+      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/IridescenceLamp/glTF-Binary/IridescenceLamp.glb';
+
   DashboardBloc() : super(DashboardInitial()) {
     on<LoadFurnitureList>(_onLoadFurnitureList);
   }
@@ -22,25 +31,25 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
           id: '1',
           name: 'Modern Sofa',
           category: 'Living Room',
-          glbPath: 'assets/models/sofa.glb',
+          glbPath: _sofaModelUrl,
         ),
         const Furniture(
           id: '2',
           name: 'Minimalist Chair',
           category: 'Dining Room',
-          glbPath: 'assets/models/chair.glb',
+          glbPath: _chairModelUrl,
         ),
         const Furniture(
           id: '3',
           name: 'Nordic Table',
           category: 'Office',
-          glbPath: 'assets/models/table.glb',
+          glbPath: _tableModelUrl,
         ),
         const Furniture(
           id: '4',
           name: 'Futuristic Lamp',
           category: 'Bedroom',
-          glbPath: 'assets/models/lamp.glb',
+          glbPath: _lampModelUrl,
         ),
         const Furniture(
           id: '5',

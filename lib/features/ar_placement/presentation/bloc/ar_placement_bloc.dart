@@ -1,7 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'ar_placement_event.dart';
 import 'ar_placement_state.dart';
-import '../../../../core/services/asset_cache_service.dart';
 
 class ARPlacementBloc extends Bloc<ARPlacementEvent, ARPlacementState> {
   ARPlacementBloc() : super(ARPlacementInitial()) {
@@ -26,30 +25,13 @@ class ARPlacementBloc extends Bloc<ARPlacementEvent, ARPlacementState> {
     }
   }
 
-  Future<void> _onSelectFurnitureForAR(
+  void _onSelectFurnitureForAR(
     SelectFurnitureForAR event,
     Emitter<ARPlacementState> emit,
-  ) async {
+  ) {
     final currentState = state;
     if (currentState is ARPlacementSuccess) {
-      if (event.furniture.glbPath.startsWith('http://') ||
-          event.furniture.glbPath.startsWith('https://')) {
-        emit(ARPlacementLoading(
-          message: 'Downloading 3D asset: ${event.furniture.name}...',
-        ));
-        try {
-          final localPath = await AssetCacheService().getLocalAssetPath(
-            event.furniture.glbPath,
-          );
-          final localFurniture = event.furniture.copyWith(glbPath: localPath);
-          emit(currentState.copyWith(selectedFurniture: localFurniture));
-        } catch (e) {
-          emit(ARPlacementError('Download failed: ${e.toString()}'));
-          emit(currentState);
-        }
-      } else {
-        emit(currentState.copyWith(selectedFurniture: event.furniture));
-      }
+      emit(currentState.copyWith(selectedFurniture: event.furniture));
     }
   }
 
