@@ -50,3 +50,12 @@
 - Main report: ci_reports/latest.md
 - Android probable causes:
   - Log missing: the job probably failed before the command was captured.
+
+## 2026-06-13 08:34:39 UTC - run 15
+- Commit: a532e8164bc7250205219745401b09ce082492d9
+- Analyze: failure, exit unknown
+- Android: failure, exit unknown
+- iOS: failure, exit unknown
+- Main report: ci_reports/latest.md
+- Android probable causes:
+  - Log missing: the job probably failed before the command was captured.
