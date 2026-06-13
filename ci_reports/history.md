@@ -41,3 +41,12 @@
 - Main report: ci_reports/latest.md
 - Android probable causes:
   - No known pattern detected yet. Inspect the key log lines below.
+
+## 2026-06-13 08:21:00 UTC - run 14
+- Commit: debf4b7f71f035d6713fb0dfb71d75356753ce24
+- Analyze: failure, exit unknown
+- Android: failure, exit unknown
+- iOS: failure, exit unknown
+- Main report: ci_reports/latest.md
+- Android probable causes:
+  - Log missing: the job probably failed before the command was captured.
