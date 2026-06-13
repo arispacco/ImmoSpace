@@ -22,4 +22,11 @@
 - [x] Integrate Firebase BaaS
     - [x] Add Firebase backend service with local fallback behavior
     - [x] Document Firestore collections and Firebase setup
+- [x] Remove AR/VR mock limitations for production release:
+    - [x] Use real `ar_flutter_plugin` and add dynamic camera permission checks
+    - [x] Integrate real-time scanning tips to assist user with surface alignment
+    - [x] Create interactive 2D top-down Floor Plan map with room teleportation
+    - [x] Implement dynamic 360° photo import from gallery (`image_picker`)
+    - [x] Create step-by-step production setup guide for user (`docs/production_setup_guide.md`)
+
 
