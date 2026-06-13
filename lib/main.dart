@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'core/navigation/app_router.dart';
+import 'core/services/firebase_backend_service.dart';
+import 'core/di/service_locator.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseBackendService.instance.initialize();
+  setupServiceLocator();
   runApp(const ImmoSpaceApp());
 }
 
@@ -24,7 +28,7 @@ class ImmoSpaceApp extends StatelessWidget {
           brightness: Brightness.light,
           primary: const Color(0xFF6C63FF),
           secondary: const Color(0xFF03DAC6),
-          background: const Color(0xFFF8F9FA),
+          surface: const Color(0xFFF8F9FA),
         ),
         fontFamily: 'Roboto',
       ),
@@ -34,8 +38,7 @@ class ImmoSpaceApp extends StatelessWidget {
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF8A84FF),
           secondary: Color(0xFF00E6FF),
-          surface: Color(0xFF1E1E2E),
-          background: Color(0xFF12121A),
+          surface: Color(0xFF12121A), // set main surface to dark background
           onPrimary: Colors.white,
           onSecondary: Colors.black,
         ),

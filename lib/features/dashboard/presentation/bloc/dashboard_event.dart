@@ -8,3 +8,13 @@ abstract class DashboardEvent extends Equatable {
 }
 
 class LoadFurnitureList extends DashboardEvent {}
+
+class SearchFurniture extends DashboardEvent {
+  final String query;
+  final String category;
+
+  const SearchFurniture({this.query = '', this.category = ''});
+
+  @override
+  List<Object?> get props => [query, category];
+}

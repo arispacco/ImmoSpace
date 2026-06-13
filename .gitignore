@@ -64,3 +64,10 @@ Podfile.lock
 Pods/
 ServiceDefinitions.json
 rcg.h
+
+# Agent reports (internal)
+.rapports_agents/
+
+# Binaries
+immospace-android-release-apk.zip
+

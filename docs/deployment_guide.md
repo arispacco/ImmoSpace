@@ -96,3 +96,12 @@ git push origin main
 ```
 
 The GitHub Actions workflow [.github/workflows/flutter_build.yml](file:///run/media/Aristide/Nouveau nom/Immospace/.github/workflows/flutter_build.yml) will trigger automatically and build the deployable `.apk` and `.ipa` artifacts.
+
+---
+
+## 5. Firebase BaaS
+
+ImmoSpace reads its furniture catalog and VR room metadata from Firebase, with
+local fallback data when Firebase is not configured. Configure Firebase after
+generating the native platform folders, then follow the collection schema and
+rules in [firebase_baas.md](firebase_baas.md).

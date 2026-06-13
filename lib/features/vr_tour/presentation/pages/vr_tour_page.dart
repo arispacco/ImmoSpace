@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:panorama_viewer/panorama_viewer.dart';
+import '../../../../core/di/service_locator.dart';
 import '../bloc/vr_tour_bloc.dart';
 import '../bloc/vr_tour_event.dart';
 import '../bloc/vr_tour_state.dart';
@@ -45,7 +46,7 @@ class _VRTourPageState extends State<VRTourPage> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => VRTourBloc()..add(InitVRTour()),
+      create: (context) => sl<VRTourBloc>()..add(InitVRTour()),
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
@@ -71,13 +72,7 @@ class _VRTourPageState extends State<VRTourPage> {
                         ),
                       );
                     }).toList(),
-                    child: Image.asset(
-                      state.currentRoom.imagePath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildMockPanorama(state.currentRoom.name);
-                      },
-                    ),
+                    child: _buildPanoramaImage(state.currentRoom),
                   );
                 } else if (state is VRTourError) {
                   return Center(
@@ -200,6 +195,36 @@ class _VRTourPageState extends State<VRTourPage> {
     );
   }
 
+  Widget _buildPanoramaImage(VRRoom room) {
+    if (_isRemotePath(room.imagePath)) {
+      return Image.network(
+        room.imagePath,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return child;
+          }
+          return _buildMockPanorama(room.name);
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return _buildMockPanorama(room.name);
+        },
+      );
+    }
+
+    return Image.asset(
+      room.imagePath,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return _buildMockPanorama(room.name);
+      },
+    );
+  }
+
+  bool _isRemotePath(String path) {
+    return path.startsWith('http://') || path.startsWith('https://');
+  }
+
   Widget _buildHeaderOverlay(BuildContext context) {
     final blurVal = _reduceEffects ? 0.0 : 12.0;
     final opacityVal = _reduceEffects ? 0.35 : 0.1;
@@ -280,6 +305,9 @@ class _VRTourPageState extends State<VRTourPage> {
         if (state is! VRTourLoaded) return const SizedBox.shrink();
 
         final activeRoomId = state.currentRoom.id;
+        final rooms = state.rooms.isNotEmpty
+            ? state.rooms
+            : <VRRoom>[state.currentRoom];
 
         return GlassContainer(
           height: 90,
@@ -288,39 +316,45 @@ class _VRTourPageState extends State<VRTourPage> {
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: Colors.white.withOpacity(0.06)),
-          child: ListView(
+          child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            children: [
-              _buildRoomCard(
+            itemCount: rooms.length,
+            itemBuilder: (context, index) {
+              final room = rooms[index];
+              return _buildRoomCard(
                 context,
-                id: 'living_room',
-                name: 'Living Room',
-                icon: Icons.chair_alt,
-                gradientColors: [const Color(0xFF6C63FF), const Color(0xFF3B33C7)],
-                isActive: activeRoomId == 'living_room',
-              ),
-              _buildRoomCard(
-                context,
-                id: 'kitchen',
-                name: 'Kitchen',
-                icon: Icons.kitchen,
-                gradientColors: [const Color(0xFF00E6FF), const Color(0xFF00869B)],
-                isActive: activeRoomId == 'kitchen',
-              ),
-              _buildRoomCard(
-                context,
-                id: 'balcony',
-                name: 'Balcony',
-                icon: Icons.balcony,
-                gradientColors: [const Color(0xFF8A84FF), const Color(0xFF4FACFE)],
-                isActive: activeRoomId == 'balcony',
-              ),
-            ],
+                id: room.id,
+                name: room.name,
+                icon: _roomIcon(room),
+                gradientColors: _roomGradient(index),
+                isActive: activeRoomId == room.id,
+              );
+            },
           ),
         );
       },
     );
+  }
+
+  IconData _roomIcon(VRRoom room) {
+    final key = '${room.id} ${room.name}'.toLowerCase();
+    if (key.contains('kitchen')) return Icons.kitchen;
+    if (key.contains('balcony')) return Icons.balcony;
+    if (key.contains('bed')) return Icons.bed_outlined;
+    if (key.contains('bath')) return Icons.bathtub_outlined;
+    if (key.contains('office')) return Icons.business_center_outlined;
+    return Icons.meeting_room_outlined;
+  }
+
+  List<Color> _roomGradient(int index) {
+    const palettes = [
+      [Color(0xFF6C63FF), Color(0xFF3B33C7)],
+      [Color(0xFF00E6FF), Color(0xFF00869B)],
+      [Color(0xFF8A84FF), Color(0xFF4FACFE)],
+      [Color(0xFF1D976C), Color(0xFF11432E)],
+    ];
+    return palettes[index % palettes.length];
   }
 
   Widget _buildRoomCard(

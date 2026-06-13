@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../domain/entities/furniture.dart';
 
 class FurnitureModel extends Furniture {
@@ -8,12 +10,21 @@ class FurnitureModel extends Furniture {
     required super.glbPath,
   });
 
-  factory FurnitureModel.fromJson(Map<String, dynamic> json) {
+  factory FurnitureModel.fromJson(Map<String, dynamic> json, {String? id}) {
     return FurnitureModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      category: json['category'] as String,
-      glbPath: json['glbPath'] as String,
+      id: id ?? _stringValue(json['id']),
+      name: _stringValue(json['name']),
+      category: _stringValue(json['category']),
+      glbPath: _stringValue(json['glbPath']),
+    );
+  }
+
+  factory FurnitureModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> document,
+  ) {
+    return FurnitureModel.fromJson(
+      document.data() ?? const {},
+      id: document.id,
     );
   }
 
@@ -24,5 +35,9 @@ class FurnitureModel extends Furniture {
       'category': category,
       'glbPath': glbPath,
     };
+  }
+
+  static String _stringValue(Object? value) {
+    return value?.toString() ?? '';
   }
 }

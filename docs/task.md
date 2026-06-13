@@ -19,5 +19,7 @@
     - [x] Implement hidden gesture and tap signature in DashboardPage
 - [x] Configure CI/CD GitHub Actions Build Pipeline
     - [x] Create flutter_build.yml workflow file
-
+- [x] Integrate Firebase BaaS
+    - [x] Add Firebase backend service with local fallback behavior
+    - [x] Document Firestore collections and Firebase setup
 

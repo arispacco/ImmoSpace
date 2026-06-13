@@ -20,22 +20,26 @@ class ARPlacementLoading extends ARPlacementState {
 }
 
 class ARPlacementSuccess extends ARPlacementState {
+  final List<Furniture> availableFurniture;
   final Furniture? selectedFurniture;
   final bool isPlaneDetected;
   final List<String> placedAnchorIds;
 
   const ARPlacementSuccess({
+    this.availableFurniture = const [],
     this.selectedFurniture,
     this.isPlaneDetected = false,
     this.placedAnchorIds = const [],
   });
 
   ARPlacementSuccess copyWith({
+    List<Furniture>? availableFurniture,
     Furniture? selectedFurniture,
     bool? isPlaneDetected,
     List<String>? placedAnchorIds,
   }) {
     return ARPlacementSuccess(
+      availableFurniture: availableFurniture ?? this.availableFurniture,
       selectedFurniture: selectedFurniture ?? this.selectedFurniture,
       isPlaneDetected: isPlaneDetected ?? this.isPlaneDetected,
       placedAnchorIds: placedAnchorIds ?? this.placedAnchorIds,
@@ -43,7 +47,7 @@ class ARPlacementSuccess extends ARPlacementState {
   }
 
   @override
-  List<Object?> get props => [selectedFurniture, isPlaneDetected, placedAnchorIds];
+  List<Object?> get props => [availableFurniture, selectedFurniture, isPlaneDetected, placedAnchorIds];
 }
 
 class ARPlacementError extends ARPlacementState {

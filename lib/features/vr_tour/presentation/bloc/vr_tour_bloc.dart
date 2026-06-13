@@ -1,74 +1,34 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/vr_room.dart';
+import '../../domain/repositories/vr_tour_repository.dart';
 import 'vr_tour_event.dart';
 import 'vr_tour_state.dart';
 
 class VRTourBloc extends Bloc<VRTourEvent, VRTourState> {
-  // Mock rooms database
-  static final Map<String, VRRoom> _mockRooms = {
-    'living_room': const VRRoom(
-      id: 'living_room',
-      name: 'Elegant Living Room',
-      imagePath: 'assets/images/living_room_360.jpg',
-      hotspots: [
-        VRHotspot(
-          id: 'h1',
-          targetRoomId: 'kitchen',
-          latitude: 45.0,
-          longitude: 0.0,
-          label: 'Go to Kitchen',
-        ),
-      ],
-    ),
-    'kitchen': const VRRoom(
-      id: 'kitchen',
-      name: 'Modern Kitchen',
-      imagePath: 'assets/images/kitchen_360.jpg',
-      hotspots: [
-        VRHotspot(
-          id: 'h2',
-          targetRoomId: 'living_room',
-          latitude: -45.0,
-          longitude: 0.0,
-          label: 'Back to Living Room',
-        ),
-        VRHotspot(
-          id: 'h3',
-          targetRoomId: 'balcony',
-          latitude: 120.0,
-          longitude: -10.0,
-          label: 'Step onto Balcony',
-        ),
-      ],
-    ),
-    'balcony': const VRRoom(
-      id: 'balcony',
-      name: 'Panoramic Balcony',
-      imagePath: 'assets/images/balcony_360.jpg',
-      hotspots: [
-        VRHotspot(
-          id: 'h4',
-          targetRoomId: 'kitchen',
-          latitude: -120.0,
-          longitude: 10.0,
-          label: 'Return to Kitchen',
-        ),
-      ],
-    ),
-  };
+  final VrTourRepository _tourRepository;
 
-  VRTourBloc() : super(VRTourInitial()) {
+  VRTourBloc({required VrTourRepository repository})
+      : _tourRepository = repository,
+        super(VRTourInitial()) {
     on<InitVRTour>(_onInitVRTour);
     on<NavigateToRoom>(_onNavigateToRoom);
   }
 
-  void _onInitVRTour(InitVRTour event, Emitter<VRTourState> emit) {
+  Future<void> _onInitVRTour(
+    InitVRTour event,
+    Emitter<VRTourState> emit,
+  ) async {
     emit(VRTourLoading());
-    final initialRoom = _mockRooms['living_room'];
-    if (initialRoom != null) {
-      emit(VRTourLoaded(initialRoom));
-    } else {
-      emit(const VRTourError('Unable to load initial scene.'));
+    try {
+      final rooms = await _tourRepository.getRooms();
+      final initialRoom = await _tourRepository.fetchInitialRoom();
+      if (initialRoom != null) {
+        emit(VRTourLoaded(initialRoom, rooms: _mergeRooms(rooms, initialRoom)));
+      } else {
+        emit(const VRTourError('Unable to load initial scene.'));
+      }
+    } catch (e) {
+      emit(VRTourError('Error initializing VR tour: ${e.toString()}'));
     }
   }
 
@@ -76,15 +36,32 @@ class VRTourBloc extends Bloc<VRTourEvent, VRTourState> {
     NavigateToRoom event,
     Emitter<VRTourState> emit,
   ) async {
+    final previousState = state;
+    final rooms = previousState is VRTourLoaded
+        ? previousState.rooms
+        : const <VRRoom>[];
+
     emit(VRTourLoading());
     // Simulate short transition load
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 250));
 
-    final nextRoom = _mockRooms[event.roomId];
-    if (nextRoom != null) {
-      emit(VRTourLoaded(nextRoom));
-    } else {
-      emit(VRTourError('Room ${event.roomId} not found.'));
+    try {
+      final nextRoom = await _tourRepository.getRoomById(event.roomId);
+      if (nextRoom != null) {
+        emit(VRTourLoaded(nextRoom, rooms: _mergeRooms(rooms, nextRoom)));
+      } else {
+        emit(VRTourError('Room ${event.roomId} not found.'));
+      }
+    } catch (e) {
+      emit(VRTourError('Error navigating to room: ${e.toString()}'));
     }
+  }
+
+  List<VRRoom> _mergeRooms(List<VRRoom> rooms, VRRoom currentRoom) {
+    final merged = <String, VRRoom>{
+      for (final room in rooms) room.id: room,
+      currentRoom.id: currentRoom,
+    };
+    return List.unmodifiable(merged.values);
   }
 }

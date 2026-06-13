@@ -1,20 +1,16 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../domain/entities/furniture.dart';
+import '../../domain/repositories/furniture_repository.dart';
 import 'dashboard_event.dart';
 import 'dashboard_state.dart';
 
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
-  static const String _sofaModelUrl =
-      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/GlamVelvetSofa/glTF-Binary/GlamVelvetSofa.glb';
-  static const String _chairModelUrl =
-      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ChairDamaskPurplegold/glTF-Binary/ChairDamaskPurplegold.glb';
-  static const String _tableModelUrl =
-      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ClearcoatWicker/glTF-Binary/ClearcoatWicker.glb';
-  static const String _lampModelUrl =
-      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/IridescenceLamp/glTF-Binary/IridescenceLamp.glb';
+  final FurnitureRepository _furnitureRepository;
 
-  DashboardBloc() : super(DashboardInitial()) {
+  DashboardBloc({required FurnitureRepository repository})
+      : _furnitureRepository = repository,
+        super(DashboardInitial()) {
     on<LoadFurnitureList>(_onLoadFurnitureList);
+    on<SearchFurniture>(_onSearchFurniture);
   }
 
   Future<void> _onLoadFurnitureList(
@@ -23,51 +19,39 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   ) async {
     emit(DashboardLoading());
     try {
-      // Simulating network or database latency
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      final mockFurniture = [
-        const Furniture(
-          id: '1',
-          name: 'Modern Sofa',
-          category: 'Living Room',
-          glbPath: _sofaModelUrl,
-        ),
-        const Furniture(
-          id: '2',
-          name: 'Minimalist Chair',
-          category: 'Dining Room',
-          glbPath: _chairModelUrl,
-        ),
-        const Furniture(
-          id: '3',
-          name: 'Nordic Table',
-          category: 'Office',
-          glbPath: _tableModelUrl,
-        ),
-        const Furniture(
-          id: '4',
-          name: 'Futuristic Lamp',
-          category: 'Bedroom',
-          glbPath: _lampModelUrl,
-        ),
-        const Furniture(
-          id: '5',
-          name: 'Designer Sheen Chair',
-          category: 'Living Room',
-          glbPath: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/SheenChair/glTF-Binary/SheenChair.glb',
-        ),
-        const Furniture(
-          id: '6',
-          name: 'Antique Decor Camera',
-          category: 'Office',
-          glbPath: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/AntiqueCamera/glTF-Binary/AntiqueCamera.glb',
-        ),
-      ];
-
-      emit(DashboardLoaded(mockFurniture));
+      final furniture = await _furnitureRepository.getFurnitureList();
+      emit(DashboardLoaded(furniture));
     } catch (e) {
       emit(DashboardError('Failed to load furniture catalog: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onSearchFurniture(
+    SearchFurniture event,
+    Emitter<DashboardState> emit,
+  ) async {
+    emit(DashboardLoading());
+    try {
+      var furniture = await _furnitureRepository.getFurnitureList();
+
+      // Filter by query (name search)
+      if (event.query.isNotEmpty) {
+        final query = event.query.toLowerCase();
+        furniture = furniture
+            .where((item) => item.name.toLowerCase().contains(query))
+            .toList();
+      }
+
+      // Filter by category (if specified and not "All")
+      if (event.category.isNotEmpty && event.category != 'All') {
+        furniture = furniture
+            .where((item) => item.category.toLowerCase() == event.category.toLowerCase())
+            .toList();
+      }
+
+      emit(DashboardLoaded(furniture));
+    } catch (e) {
+      emit(DashboardError('Failed to filter furniture catalog: ${e.toString()}'));
     }
   }
 }

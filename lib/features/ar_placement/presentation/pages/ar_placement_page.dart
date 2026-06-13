@@ -15,6 +15,7 @@ import 'package:ar_flutter_plugin/models/ar_node.dart';
 import 'package:ar_flutter_plugin/datatypes/node_types.dart';
 import 'package:vector_math/vector_math_64.dart' as vector;
 
+import '../../../../core/di/service_locator.dart';
 import '../bloc/ar_placement_bloc.dart';
 import '../bloc/ar_placement_event.dart';
 import '../bloc/ar_placement_state.dart';
@@ -22,15 +23,6 @@ import '../../../dashboard/domain/entities/furniture.dart';
 import '../../../../core/presentation/widgets/glass_container.dart';
 import '../widgets/radar_scanner.dart';
 import '../../../../core/utils/battery_optimizer.dart';
-
-const String _sofaModelUrl =
-    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/GlamVelvetSofa/glTF-Binary/GlamVelvetSofa.glb';
-const String _chairModelUrl =
-    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ChairDamaskPurplegold/glTF-Binary/ChairDamaskPurplegold.glb';
-const String _tableModelUrl =
-    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ClearcoatWicker/glTF-Binary/ClearcoatWicker.glb';
-const String _lampModelUrl =
-    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/IridescenceLamp/glTF-Binary/IridescenceLamp.glb';
 
 class ARPlacementPage extends StatefulWidget {
   final Furniture? selectedFurniture;
@@ -118,13 +110,8 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) {
-        final bloc = ARPlacementBloc()..add(InitializeAREngine());
-        if (widget.selectedFurniture != null) {
-          bloc.add(SelectFurnitureForAR(widget.selectedFurniture!));
-        }
-        return bloc;
-      },
+      create: (context) => sl<ARPlacementBloc>()
+        ..add(InitializeAREngine(initialFurniture: widget.selectedFurniture)),
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
@@ -686,71 +673,14 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
 
               SizedBox(
                 height: 60,
-                child: ListView(
+                child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
-                  children: [
-                    _buildSwitchItemCard(
-                      context,
-                      const Furniture(
-                        id: '1',
-                        name: 'Sofa',
-                        category: 'Living Room',
-                        glbPath: _sofaModelUrl,
-                      ),
-                      selected,
-                    ),
-                    _buildSwitchItemCard(
-                      context,
-                      const Furniture(
-                        id: '2',
-                        name: 'Chair',
-                        category: 'Dining Room',
-                        glbPath: _chairModelUrl,
-                      ),
-                      selected,
-                    ),
-                    _buildSwitchItemCard(
-                      context,
-                      const Furniture(
-                        id: '3',
-                        name: 'Table',
-                        category: 'Office',
-                        glbPath: _tableModelUrl,
-                      ),
-                      selected,
-                    ),
-                    _buildSwitchItemCard(
-                      context,
-                      const Furniture(
-                        id: '4',
-                        name: 'Lamp',
-                        category: 'Bedroom',
-                        glbPath: _lampModelUrl,
-                      ),
-                      selected,
-                    ),
-                    _buildSwitchItemCard(
-                      context,
-                      const Furniture(
-                        id: '5',
-                        name: 'Sheen Chair',
-                        category: 'Living Room',
-                        glbPath: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/SheenChair/glTF-Binary/SheenChair.glb',
-                      ),
-                      selected,
-                    ),
-                    _buildSwitchItemCard(
-                      context,
-                      const Furniture(
-                        id: '6',
-                        name: 'Camera Decor',
-                        category: 'Office',
-                        glbPath: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/AntiqueCamera/glTF-Binary/AntiqueCamera.glb',
-                      ),
-                      selected,
-                    ),
-                  ],
+                  itemCount: state is ARPlacementSuccess ? state.availableFurniture.length : 0,
+                  itemBuilder: (context, index) {
+                    final furniture = (state as ARPlacementSuccess).availableFurniture[index];
+                    return _buildSwitchItemCard(context, furniture, selected);
+                  },
                 ),
               ),
             ],

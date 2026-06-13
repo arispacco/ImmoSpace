@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/di/service_locator.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
@@ -15,6 +16,7 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  late final DashboardBloc _dashboardBloc;
   final TextEditingController _searchController = TextEditingController();
   
   // Easter egg variables
@@ -24,6 +26,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _dashboardBloc = sl<DashboardBloc>()..add(LoadFurnitureList());
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -42,6 +45,8 @@ class _DashboardPageState extends State<DashboardPage> {
       
       // Trigger the authorship pop-up
       _triggerAuthorshipVerification();
+    } else {
+      _dashboardBloc.add(SearchFurniture(query: text));
     }
   }
 
@@ -66,8 +71,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => DashboardBloc()..add(LoadFurnitureList()),
+    return BlocProvider<DashboardBloc>.value(
+      value: _dashboardBloc,
       child: Scaffold(
         body: Container(
           decoration: const BoxDecoration(

@@ -8,7 +8,14 @@ abstract class ARPlacementEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class InitializeAREngine extends ARPlacementEvent {}
+class InitializeAREngine extends ARPlacementEvent {
+  final Furniture? initialFurniture;
+
+  const InitializeAREngine({this.initialFurniture});
+
+  @override
+  List<Object?> get props => [initialFurniture];
+}
 
 class SelectFurnitureForAR extends ARPlacementEvent {
   final Furniture furniture;

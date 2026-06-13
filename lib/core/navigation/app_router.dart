@@ -17,8 +17,11 @@ final GoRouter appRouter = GoRouter(
       path: '/detail',
       name: 'detail',
       builder: (context, state) {
-        final furniture = state.extra as Furniture;
-        return FurnitureDetailPage(furniture: furniture);
+        final extra = state.extra;
+        if (extra is Furniture) {
+          return FurnitureDetailPage(furniture: extra);
+        }
+        return const DashboardPage();
       },
     ),
     GoRoute(
