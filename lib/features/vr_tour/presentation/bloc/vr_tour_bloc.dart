@@ -12,6 +12,7 @@ class VRTourBloc extends Bloc<VRTourEvent, VRTourState> {
         super(VRTourInitial()) {
     on<InitVRTour>(_onInitVRTour);
     on<NavigateToRoom>(_onNavigateToRoom);
+    on<AddCustomRoom>(_onAddCustomRoom);
   }
 
   Future<void> _onInitVRTour(
@@ -54,6 +55,23 @@ class VRTourBloc extends Bloc<VRTourEvent, VRTourState> {
       }
     } catch (e) {
       emit(VRTourError('Error navigating to room: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onAddCustomRoom(
+    AddCustomRoom event,
+    Emitter<VRTourState> emit,
+  ) async {
+    emit(VRTourLoading());
+    try {
+      await _tourRepository.addRoom(event.room);
+      final updatedRooms = await _tourRepository.getRooms();
+      emit(VRTourLoaded(
+        event.room,
+        rooms: _mergeRooms(updatedRooms, event.room),
+      ));
+    } catch (e) {
+      emit(VRTourError('Error adding room: ${e.toString()}'));
     }
   }
 

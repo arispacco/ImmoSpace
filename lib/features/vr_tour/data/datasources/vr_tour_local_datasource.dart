@@ -70,4 +70,10 @@ class VrTourLocalDatasource {
     }
     return room;
   }
+
+  /// Adds a custom VR room.
+  Future<void> addRoom(VRRoom room) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    _mockRooms[room.id] = room;
+  }
 }

@@ -110,4 +110,37 @@ class VrTourRepositoryImpl implements VrTourRepository {
       return null;
     }
   }
+
+  @override
+  Future<void> addRoom(VRRoom room) async {
+    // Always update local datasource
+    await localDatasource.addRoom(room);
+
+    final firestore = await _backend.firestore();
+    if (firestore == null) {
+      debugPrint('Firestore not available, saved room locally only');
+      return;
+    }
+
+    try {
+      final docData = {
+        'name': room.name,
+        'imagePath': room.imagePath,
+        'isInitial': false,
+        'hotspots': room.hotspots
+            .map((h) => {
+                  'id': h.id,
+                  'targetRoomId': h.targetRoomId,
+                  'latitude': h.latitude,
+                  'longitude': h.longitude,
+                  'label': h.label,
+                })
+            .toList(),
+      };
+      await firestore.collection(_collectionName).doc(room.id).set(docData);
+      debugPrint('Saved VR Room to Firestore successfully');
+    } catch (e) {
+      debugPrint('Error saving VR room to Firestore: $e. Saved locally only.');
+    }
+  }
 }

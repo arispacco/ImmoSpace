@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:panorama_viewer/panorama_viewer.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/service_locator.dart';
 import '../bloc/vr_tour_bloc.dart';
 import '../bloc/vr_tour_event.dart';
@@ -453,86 +454,397 @@ class _VRTourPageState extends State<VRTourPage> {
     final blurVal = _reduceEffects ? 0.0 : 12.0;
     final opacityVal = _reduceEffects ? 0.35 : 0.12;
 
-    return GlassContainer(
-      opacity: opacityVal,
-      blur: blurVal,
-      borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: Colors.white.withOpacity(0.06)),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
+    return BlocBuilder<VRTourBloc, VRTourState>(
+      builder: (context, state) {
+        return GlassContainer(
+          opacity: opacityVal,
+          blur: blurVal,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isGyro ? const Color(0xFF00E6FF).withOpacity(0.15) : Colors.white10,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isGyro ? Icons.screen_rotation : Icons.touch_app,
-                  color: isGyro ? const Color(0xFF00E6FF) : Colors.white60,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              // Gyro / Touch Toggle icon
+              Row(
                 children: [
-                  Row(
+                  IconButton(
+                    icon: Icon(
+                      isGyro ? Icons.screen_rotation : Icons.touch_app,
+                      color: isGyro ? const Color(0xFF00E6FF) : Colors.white60,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _sensorControl = isGyro ? SensorControl.none : SensorControl.orientation;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            !isGyro ? 'Switched to Gyroscope Navigation' : 'Switched to Touch Navigation',
+                          ),
+                          duration: const Duration(seconds: 1),
+                          backgroundColor: const Color(0xFF1E1E2E),
+                        ),
+                      );
+                    },
+                    tooltip: 'Toggle VR controls',
+                  ),
+                  const SizedBox(width: 4),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'VR Control Mode',
-                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        'Controls',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                       ),
-                      if (_reduceEffects) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text('BATTERY OPTIMIZED', style: TextStyle(color: Colors.amber, fontSize: 6, fontWeight: FontWeight.bold)),
-                        ),
-                      ]
+                      Text(
+                        isGyro ? 'Gyro Active' : 'Touch Active',
+                        style: const TextStyle(color: Colors.white38, fontSize: 8),
+                      ),
                     ],
                   ),
-                  Text(
-                    isGyro ? 'Gyroscope / Sensor Active' : 'Touch / Drag Gestures Active',
-                    style: const TextStyle(color: Colors.white38, fontSize: 9),
+                ],
+              ),
+
+              // Plan & Add Room Actions
+              Row(
+                children: [
+                  // Map Button
+                  TextButton.icon(
+                    onPressed: () => _showFloorPlan(context, state),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF8A84FF),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    icon: const Icon(Icons.map_outlined, size: 16),
+                    label: const Text('Plan', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 6),
+                  // Import Photo Button
+                  TextButton.icon(
+                    onPressed: () => _import360Photo(context),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF00E6FF),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    icon: const Icon(Icons.add_a_photo_outlined, size: 16),
+                    label: const Text('Add Room', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
             ],
           ),
+        );
+      },
+    );
+  }
 
-          Switch(
-            value: isGyro,
-            activeColor: const Color(0xFF00E6FF),
-            activeTrackColor: const Color(0xFF00E6FF).withOpacity(0.2),
-            inactiveThumbColor: Colors.white70,
-            inactiveTrackColor: Colors.white12,
-            onChanged: (bool val) {
-              setState(() {
-                _sensorControl = val ? SensorControl.orientation : SensorControl.none;
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    val ? 'Switched to Gyroscope Navigation' : 'Switched to Touch Navigation',
+  void _showFloorPlan(BuildContext context, VRTourState state) {
+    if (state is! VRTourLoaded) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF12121A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(color: const Color(0xFF00E6FF).withOpacity(0.3), width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.map_outlined, color: Color(0xFF00E6FF)),
+            SizedBox(width: 12),
+            Text(
+              'Interactive Floor Plan',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.85,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Top-down map layout. Tap a room to enter it immediately.',
+                style: TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+              const SizedBox(height: 24),
+              // House Layout Grid
+              AspectRatio(
+                aspectRatio: 1.4,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
                   ),
-                  duration: const Duration(seconds: 1),
-                  backgroundColor: const Color(0xFF1E1E2E),
+                  child: Stack(
+                    children: [
+                      // Balcony (Top outer)
+                      Positioned(
+                        top: 0,
+                        left: 60,
+                        right: 60,
+                        height: 40,
+                        child: _buildFloorPlanRoom(
+                          context,
+                          dialogCtx,
+                          id: 'balcony',
+                          name: 'Balcony 🌅',
+                          state: state,
+                          color: const Color(0xFF1D976C),
+                        ),
+                      ),
+                      // Living Room (Center Main)
+                      Positioned(
+                        top: 50,
+                        left: 80,
+                        right: 0,
+                        bottom: 0,
+                        child: _buildFloorPlanRoom(
+                          context,
+                          dialogCtx,
+                          id: 'living_room',
+                          name: 'Living Room 🛋\n(Main Hub)',
+                          state: state,
+                          color: const Color(0xFF6C63FF),
+                        ),
+                      ),
+                      // Kitchen (Left side of Living Room)
+                      Positioned(
+                        top: 50,
+                        left: 0,
+                        width: 70,
+                        bottom: 0,
+                        child: _buildFloorPlanRoom(
+                          context,
+                          dialogCtx,
+                          id: 'kitchen',
+                          name: 'Kitchen 🍳',
+                          state: state,
+                          color: const Color(0xFF00E6FF),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              );
-            },
+              ),
+              const SizedBox(height: 20),
+              // User imported rooms section
+              if (state.rooms.where((r) => r.id != 'living_room' && r.id != 'kitchen' && r.id != 'balcony').isNotEmpty) ...[
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Custom Imported Rooms',
+                    style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  maxHeight: 100,
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: state.rooms
+                          .where((r) => r.id != 'living_room' && r.id != 'kitchen' && r.id != 'balcony')
+                          .map((room) => _buildCustomRoomChip(context, dialogCtx, room, state))
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                const Text(
+                  'No custom rooms added yet. Import 360° photos below.',
+                  style: TextStyle(color: Colors.white30, fontSize: 10),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Close Map', style: TextStyle(color: Colors.white38)),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildFloorPlanRoom(
+    BuildContext context,
+    BuildContext dialogCtx, {
+    required String id,
+    required String name,
+    required VRTourState state,
+    required Color color,
+  }) {
+    final bool isActive = (state is VRTourLoaded) && state.currentRoom.id == id;
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(dialogCtx);
+        if (!isActive) {
+          context.read<VRTourBloc>().add(NavigateToRoom(id));
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: isActive ? color.withOpacity(0.25) : color.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isActive ? color : color.withOpacity(0.3),
+            width: isActive ? 2.0 : 1.0,
+          ),
+          boxShadow: isActive
+              ? [BoxShadow(color: color.withOpacity(0.2), blurRadius: 8)]
+              : null,
+        ),
+        child: Center(
+          child: Text(
+            name,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isActive ? Colors.white : Colors.white70,
+              fontSize: 10,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomRoomChip(
+    BuildContext context,
+    BuildContext dialogCtx,
+    VRRoom room,
+    VRTourState state,
+  ) {
+    final bool isActive = (state is VRTourLoaded) && state.currentRoom.id == room.id;
+    return ActionChip(
+      backgroundColor: isActive ? const Color(0xFF8A84FF).withOpacity(0.25) : Colors.white.withOpacity(0.04),
+      side: BorderSide(
+        color: isActive ? const Color(0xFF8A84FF) : Colors.white10,
+        width: isActive ? 1.5 : 1.0,
+      ),
+      label: Text(
+        '${room.name} 📸',
+        style: TextStyle(
+          color: isActive ? Colors.white : Colors.white70,
+          fontSize: 10,
+          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      onPressed: () {
+        Navigator.pop(dialogCtx);
+        if (!isActive) {
+          context.read<VRTourBloc>().add(NavigateToRoom(room.id));
+        }
+      },
+    );
+  }
+
+  Future<void> _import360Photo(BuildContext context) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 95,
+    );
+
+    if (pickedFile == null) {
+      return;
+    }
+
+    if (!mounted) return;
+
+    // Show text entry dialog for the room name
+    final textController = TextEditingController();
+    final nameDialogResult = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Name your custom room',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'e.g. Bathroom, Master Bedroom',
+            hintStyle: const TextStyle(color: Colors.white30),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: const Color(0xFF00E6FF).withOpacity(0.5)),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF00E6FF)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final val = textController.text.trim();
+              if (val.isNotEmpty) {
+                Navigator.pop(dialogCtx, val);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00E6FF),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Save Room', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (nameDialogResult == null || nameDialogResult.isEmpty) {
+      return;
+    }
+
+    // Generate unique ID and entity
+    final uniqueId = 'room_${DateTime.now().millisecondsSinceEpoch}';
+    final newRoom = VRRoom(
+      id: uniqueId,
+      name: nameDialogResult,
+      imagePath: pickedFile.path, // Picked local path
+      hotspots: [
+        // Create an automatic hotspot pointing back to the living room so they aren't trapped
+        VRHotspot(
+          id: 'exit_${uniqueId}',
+          targetRoomId: 'living_room',
+          latitude: 0.0,
+          longitude: 180.0,
+          label: 'Return to Living Room',
+        ),
+      ],
+    );
+
+    if (mounted) {
+      context.read<VRTourBloc>().add(AddCustomRoom(newRoom));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Custom scene "${newRoom.name}" imported successfully!'),
+          backgroundColor: const Color(0xFF00E6FF),
+          foregroundColor: Colors.black,
+        ),
+      );
+    }
   }
 
   void _showHelpDialog(BuildContext context) {

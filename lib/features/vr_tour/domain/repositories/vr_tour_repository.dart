@@ -10,4 +10,7 @@ abstract class VrTourRepository {
 
   /// Fetches the starting room for the VR Tour.
   Future<VRRoom?> fetchInitialRoom();
+
+  /// Adds a new VR room to the repository (local/remote).
+  Future<void> addRoom(VRRoom room);
 }

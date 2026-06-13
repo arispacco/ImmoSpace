@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +15,7 @@ import 'package:ar_flutter_plugin/models/ar_hittest_result.dart';
 import 'package:ar_flutter_plugin/models/ar_node.dart';
 import 'package:ar_flutter_plugin/datatypes/node_types.dart';
 import 'package:vector_math/vector_math_64.dart' as vector;
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../bloc/ar_placement_bloc.dart';
@@ -44,7 +46,20 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
   final List<ARAnchor> _placedAnchors = [];
 
   // Local state for checking simulator fallback
-  bool _useSimulationFallback = true;
+  bool _useSimulationFallback = false; // Default to native AR for real production
+  bool _cameraPermissionGranted = false;
+  bool _checkingPermission = true;
+
+  // Alternating scanning advice tips to guide the user
+  int _currentScanningTipIndex = 0;
+  Timer? _tipTimer;
+  final List<String> _scanningTips = [
+    'Slowly rotate phone to scan floor surface',
+    'Tip: Point the camera at a flat, well-lit surface',
+    'Tip: Move your phone slowly from left to right',
+    'Tip: Ensure the floor has visible texture (e.g. rug, tiles)',
+    'Tip: Keep moving slightly to help the camera scan'
+  ];
 
   // Spatial controls state
   double _rotationAngle = 0.0; // in degrees (0 - 360)
@@ -55,6 +70,8 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
   void initState() {
     super.initState();
     _checkBatteryStatus();
+    _requestCameraPermission();
+    _startTipTimer();
   }
 
   Future<void> _checkBatteryStatus() async {
@@ -66,8 +83,31 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
     }
   }
 
+  Future<void> _requestCameraPermission() async {
+    final status = await Permission.camera.request();
+    if (mounted) {
+      setState(() {
+        _cameraPermissionGranted = status.isGranted;
+        _checkingPermission = false;
+        // Default to native AR if permission is granted, otherwise use fallback
+        _useSimulationFallback = !status.isGranted;
+      });
+    }
+  }
+
+  void _startTipTimer() {
+    _tipTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (mounted && !_useSimulationFallback) {
+        setState(() {
+          _currentScanningTipIndex = (_currentScanningTipIndex + 1) % _scanningTips.length;
+        });
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _tipTimer?.cancel();
     // CRITICAL: Clean up all placed 3D objects and anchors
     _cleanupARResources();
     super.dispose();
@@ -382,7 +422,25 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
           border: Border.all(color: Colors.white.withOpacity(0.08)),
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: TextButton.icon(
-            onPressed: () {
+            onPressed: () async {
+              if (_useSimulationFallback) {
+                // If switching to native, request/verify camera permission first
+                final status = await Permission.camera.status;
+                if (!status.isGranted) {
+                  final reqStatus = await Permission.camera.request();
+                  if (!reqStatus.isGranted) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Camera permission is required for Native AR mode.'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                }
+              }
               setState(() {
                 _useSimulationFallback = !_useSimulationFallback;
               });
@@ -416,7 +474,7 @@ class _ARPlacementPageState extends State<ARPlacementPage> {
           if (state.selectedFurniture == null) {
             message = 'Select furniture from bottom drawer to start projecting';
           } else if (!state.isPlaneDetected && !_useSimulationFallback) {
-            message = 'Slowly rotate phone to scan floor surface';
+            message = _scanningTips[_currentScanningTipIndex];
           } else {
             message = 'Surface detected! Tap anywhere on plane to place ${state.selectedFurniture!.name}';
             isLocked = true;

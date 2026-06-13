@@ -17,3 +17,12 @@ class NavigateToRoom extends VRTourEvent {
   @override
   List<Object?> get props => [roomId];
 }
+
+class AddCustomRoom extends VRTourEvent {
+  final VRRoom room;
+
+  const AddCustomRoom(this.room);
+
+  @override
+  List<Object?> get props => [room];
+}
