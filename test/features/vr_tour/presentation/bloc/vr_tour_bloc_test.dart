@@ -13,6 +13,15 @@ void main() {
   late MockVrTourRepository mockRepository;
   late VRTourBloc vrTourBloc;
 
+  setUpAll(() {
+    registerFallbackValue(const VRRoom(
+      id: '',
+      name: '',
+      imagePath: '',
+      hotspots: [],
+    ));
+  });
+
   setUp(() {
     mockRepository = MockVrTourRepository();
     vrTourBloc = VRTourBloc(repository: mockRepository);
@@ -99,6 +108,38 @@ void main() {
       expect: () => [
         VRTourLoading(),
         const VRTourError('Room unknown not found.'),
+      ],
+    );
+  });
+
+  group('VRTourBloc - AddCustomRoom', () {
+    blocTest<VRTourBloc, VRTourState>(
+      'emits [VRTourLoading, VRTourLoaded] and navigates to it after adding custom room',
+      build: () {
+        when(() => mockRepository.addRoom(any()))
+            .thenAnswer((_) async => {});
+        when(() => mockRepository.getRooms())
+            .thenAnswer((_) async => [testRoom1, testRoom2]);
+        return vrTourBloc;
+      },
+      act: (bloc) => bloc.add(AddCustomRoom(testRoom2)),
+      expect: () => [
+        VRTourLoading(),
+        VRTourLoaded(testRoom2, rooms: [testRoom1, testRoom2]),
+      ],
+    );
+
+    blocTest<VRTourBloc, VRTourState>(
+      'emits [VRTourLoading, VRTourError] when adding custom room fails',
+      build: () {
+        when(() => mockRepository.addRoom(any()))
+            .thenThrow(Exception('DB error'));
+        return vrTourBloc;
+      },
+      act: (bloc) => bloc.add(AddCustomRoom(testRoom2)),
+      expect: () => [
+        VRTourLoading(),
+        const VRTourError('Error adding room: Exception: DB error'),
       ],
     );
   });
