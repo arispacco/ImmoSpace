@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'core/navigation/app_router.dart';
+<<<<<<< Updated upstream
 import 'core/services/firebase_backend_service.dart';
 import 'core/di/service_locator.dart';
+=======
+import 'core/services/asset_cache_service.dart';
+>>>>>>> Stashed changes
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FirebaseBackendService.instance.initialize();
+<<<<<<< Updated upstream
   setupServiceLocator();
+=======
+>>>>>>> Stashed changes
   runApp(const ImmoSpaceApp());
 }
 
@@ -38,7 +45,11 @@ class ImmoSpaceApp extends StatelessWidget {
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF8A84FF),
           secondary: Color(0xFF00E6FF),
+<<<<<<< Updated upstream
           surface: Color(0xFF12121A), // set main surface to dark background
+=======
+          surface: Color(0xFF1E1E2E),
+>>>>>>> Stashed changes
           onPrimary: Colors.white,
           onSecondary: Colors.black,
         ),
@@ -54,7 +65,7 @@ class ImmoSpaceApp extends StatelessWidget {
             letterSpacing: 1.2,
           ),
         ),
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           color: const Color(0xFF1E1E2E),
           elevation: 4,
           shape: RoundedRectangleBorder(

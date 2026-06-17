@@ -13,7 +13,7 @@ Use the following CLI commands to initialize this project on your development ma
 flutter create --org com.immospace --project-name immospace --platforms android,ios .
 
 # 2. Add the requested package dependencies to pubspec.yaml
-flutter pub add flutter_bloc equatable panorama_viewer ar_flutter_plugin go_router
+flutter pub add firebase_core cloud_firestore firebase_auth flutter_bloc equatable panorama_viewer go_router
 
 # 3. Fetch dependencies to resolve the packages
 flutter pub get
