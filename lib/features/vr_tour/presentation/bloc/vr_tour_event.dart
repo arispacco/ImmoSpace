@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../domain/entities/vr_room.dart';
 
 abstract class VRTourEvent extends Equatable {
   const VRTourEvent();

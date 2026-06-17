@@ -196,7 +196,7 @@ class _VRTourPageState extends State<VRTourPage> {
     );
   }
 
-  Widget _buildPanoramaImage(VRRoom room) {
+  Image _buildPanoramaImage(VRRoom room) {
     if (_isRemotePath(room.imagePath)) {
       return Image.network(
         room.imagePath,
@@ -644,8 +644,8 @@ class _VRTourPageState extends State<VRTourPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                SizedBox(
-                  maxHeight: 100,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 100),
                   child: SingleChildScrollView(
                     child: Wrap(
                       spacing: 8,
@@ -839,9 +839,11 @@ class _VRTourPageState extends State<VRTourPage> {
       context.read<VRTourBloc>().add(AddCustomRoom(newRoom));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Custom scene "${newRoom.name}" imported successfully!'),
+          content: Text(
+            'Custom scene "${newRoom.name}" imported successfully!',
+            style: const TextStyle(color: Colors.black),
+          ),
           backgroundColor: const Color(0xFF00E6FF),
-          foregroundColor: Colors.black,
         ),
       );
     }
