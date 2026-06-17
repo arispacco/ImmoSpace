@@ -274,15 +274,15 @@ def patch_ios():
         with open(podfile_path, 'r') as f:
             podfile_content = f.read()
             
-        # Set global platform to ios 13.0
+        # Set global platform to ios 15.0
         podfile_content = re.sub(
             r'#\s*platform\s*:\s*ios,\s*[\'"]\d+(?:\.\d+)*[\'"]',
-            "platform :ios, '13.0'",
+            "platform :ios, '15.0'",
             podfile_content
         )
         podfile_content = re.sub(
             r'platform\s*:\s*ios,\s*[\'"]\d+(?:\.\d+)*[\'"]',
-            "platform :ios, '13.0'",
+            "platform :ios, '15.0'",
             podfile_content
         )
         
@@ -290,7 +290,7 @@ def patch_ios():
         original_line = 'flutter_additional_ios_build_settings(target)'
         replacement = """flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
       config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
     end"""
