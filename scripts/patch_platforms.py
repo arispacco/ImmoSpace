@@ -199,7 +199,7 @@ def patch_android():
     with open(manifest_path, 'w') as f:
         f.write(content)
         
-    # 3. Patch build.gradle to minSdkVersion 24 (Groovy)
+    # 3. Patch build.gradle to minSdkVersion 24 and compileSdk 34 (Groovy)
     gradle_path = 'android/app/build.gradle'
     if os.path.exists(gradle_path):
         with open(gradle_path, 'r') as f:
@@ -210,6 +210,19 @@ def patch_android():
         gradle_content = gradle_content.replace('minSdkVersion 19', 'minSdkVersion 24')
         gradle_content = gradle_content.replace('minSdkVersion 20', 'minSdkVersion 24')
         gradle_content = gradle_content.replace('minSdkVersion 21', 'minSdkVersion 24')
+        
+        gradle_content = re.sub(r'compileSdk(?:Version)?\s*=?\s*(?:flutter\.compileSdkVersion|\d+)', 'compileSdk = 34', gradle_content)
+        
+        proguard_rules = "-keep class com.google.ar.sceneform.** { *; }\n-keep class com.google.ar.core.** { *; }\n-dontwarn com.google.ar.sceneform.**\n"
+        with open('android/app/proguard-rules.pro', 'w') as f_pro:
+            f_pro.write(proguard_rules)
+            
+        if 'proguardFiles' not in gradle_content:
+            gradle_content = gradle_content.replace(
+                'buildTypes {',
+                'buildTypes {\n        release {\n            signingConfig signingConfigs.debug\n            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }'
+            )
+            
         gradle_content = exclude_legacy_support_dependencies(gradle_content)
         
         with open(gradle_path, 'w') as f:
@@ -267,6 +280,18 @@ def patch_ios():
     with open(plist_path, 'w') as f:
         f.write(content)
         
+    # Patch ios/Runner.xcodeproj/project.pbxproj
+    pbxproj_path = 'ios/Runner.xcodeproj/project.pbxproj'
+    if os.path.exists(pbxproj_path):
+        print("Patching ios/Runner.xcodeproj/project.pbxproj...")
+        with open(pbxproj_path, 'r') as f:
+            pbx_content = f.read()
+            
+        pbx_content = re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = \d+(\.\d+)*;', 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;', pbx_content)
+        
+        with open(pbxproj_path, 'w') as f:
+            f.write(pbx_content)
+
     # Patch ios/Podfile
     podfile_path = 'ios/Podfile'
     if os.path.exists(podfile_path):
