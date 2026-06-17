@@ -42,15 +42,10 @@ jobs:
 
       - name: Run Flutter Analyze
         id: flutter_analyze
-        continue-on-error: true
         shell: bash
         run: |
           mkdir -p ci_reports
-          set +e
           flutter analyze 2>&1 | tee ci_reports/flutter_analyze.log
-          status=${PIPESTATUS[0]}
-          echo "${status}" > ci_reports/flutter_analyze.exitcode
-          exit "${status}"
 
       - name: Upload Analyze Report
         if: always()
@@ -59,16 +54,8 @@ jobs:
           name: ci-report-analyze
           path: |
             ci_reports/flutter_analyze.log
-            ci_reports/flutter_analyze.exitcode
           if-no-files-found: warn
           retention-days: 14
-
-      - name: Fail If Analyze Failed
-        if: always()
-        shell: bash
-        run: |
-          status="$(cat ci_reports/flutter_analyze.exitcode 2>/dev/null || echo 1)"
-          exit "${status}"
 
   build-android:
     name: Build Android APK
@@ -103,18 +90,12 @@ jobs:
 
       - name: Build Release APK
         id: android_build
-        continue-on-error: true
         shell: bash
         run: |
           mkdir -p ci_reports
-          set +e
           flutter build apk --release 2>&1 | tee ci_reports/android_build.log
-          status=${PIPESTATUS[0]}
-          echo "${status}" > ci_reports/android_build.exitcode
-          exit "${status}"
 
       - name: Upload APK Artifact
-        if: steps.android_build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: immospace-android-release-apk
@@ -129,16 +110,8 @@ jobs:
           name: ci-report-android
           path: |
             ci_reports/android_build.log
-            ci_reports/android_build.exitcode
           if-no-files-found: warn
           retention-days: 14
-
-      - name: Fail If Android Build Failed
-        if: always()
-        shell: bash
-        run: |
-          status="$(cat ci_reports/android_build.exitcode 2>/dev/null || echo 1)"
-          exit "${status}"
 
   build-ios:
     name: Build iOS IPA (Unsigned)
@@ -166,18 +139,12 @@ jobs:
 
       - name: Build iOS Runner (Unsigned)
         id: ios_build
-        continue-on-error: true
         shell: bash
         run: |
           mkdir -p ci_reports
-          set +e
           flutter build ios --release --no-codesign 2>&1 | tee ci_reports/ios_build.log
-          status=${PIPESTATUS[0]}
-          echo "${status}" > ci_reports/ios_build.exitcode
-          exit "${status}"
 
       - name: Package Unsigned IPA
-        if: steps.ios_build.outcome == 'success'
         shell: bash
         run: |
           mkdir -p Payload
@@ -185,7 +152,6 @@ jobs:
           zip -r Runner.ipa Payload
 
       - name: Upload IPA Artifact
-        if: steps.ios_build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: immospace-ios-unsigned-ipa
@@ -200,16 +166,8 @@ jobs:
           name: ci-report-ios
           path: |
             ci_reports/ios_build.log
-            ci_reports/ios_build.exitcode
           if-no-files-found: warn
           retention-days: 14
-
-      - name: Fail If iOS Build Failed
-        if: always()
-        shell: bash
-        run: |
-          status="$(cat ci_reports/ios_build.exitcode 2>/dev/null || echo 1)"
-          exit "${status}"
 
   publish-ci-report:
     name: Publish CI Diagnostic Report
