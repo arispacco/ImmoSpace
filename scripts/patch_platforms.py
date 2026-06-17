@@ -213,14 +213,14 @@ def patch_android():
         
         gradle_content = re.sub(r'compileSdk(?:Version)?\s*=?\s*(?:flutter\.compileSdkVersion|\d+)', 'compileSdk = 34', gradle_content)
         
-        proguard_rules = "-keep class com.google.ar.sceneform.** { *; }\n-keep class com.google.ar.core.** { *; }\n-dontwarn com.google.ar.sceneform.**\n"
+        proguard_rules = "-keep class com.google.ar.** { *; }\n-dontwarn com.google.ar.**\n-dontwarn com.google.devtools.build.android.desugar.runtime.**\n-dontwarn java.util.concurrent.**\n-dontwarn java.lang.invoke.**\n-dontwarn java.util.function.**\n"
         with open('android/app/proguard-rules.pro', 'w') as f_pro:
             f_pro.write(proguard_rules)
             
         if 'proguardFiles' not in gradle_content:
             gradle_content = gradle_content.replace(
-                'buildTypes {',
-                'buildTypes {\n        release {\n            signingConfig signingConfigs.debug\n            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }'
+                'release {',
+                'release {\n            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"'
             )
             
         gradle_content = exclude_legacy_support_dependencies(gradle_content)
@@ -318,10 +318,20 @@ def patch_ios():
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
       config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+      
+      if config.build_settings['OTHER_CFLAGS']
+        config.build_settings['OTHER_CFLAGS'] << ' -Wno-error=non-modular-include-in-framework-module'
+      else
+        config.build_settings['OTHER_CFLAGS'] = '-Wno-error=non-modular-include-in-framework-module'
+      end
     end"""
         
         if original_line in podfile_content:
             podfile_content = podfile_content.replace(original_line, replacement)
+            
+        # Force static linkage to avoid Firebase module redefinition and C-header conflicts
+        if 'use_frameworks!' in podfile_content and ':linkage => :static' not in podfile_content:
+            podfile_content = podfile_content.replace('use_frameworks!', 'use_frameworks! :linkage => :static')
             
         with open(podfile_path, 'w') as f:
             f.write(podfile_content)
@@ -366,6 +376,7 @@ def fix_ar_flutter_plugin():
 
         content = align_kotlin_jvm_target(content)
         content = exclude_legacy_support_dependencies(content)
+        content = re.sub(r'compileSdk(?:Version)?\s*=?\s*(?:flutter\.compileSdkVersion|\d+)', 'compileSdk = 34', content)
         
         with open(path, 'w') as f:
             f.write(content)
@@ -430,6 +441,9 @@ def fix_pub_cache_android_plugins():
 
         patched = align_kotlin_jvm_target(content)
         patched = exclude_legacy_support_dependencies(patched)
+        
+        patched = re.sub(r'compileSdk(?:Version)?\s*=?\s*(?:flutter\.compileSdkVersion|\d+)', 'compileSdk = 34', patched)
+        
         if patched != content:
             print(f"Patching Android plugin Gradle config at {path}")
             with open(path, 'w') as f:
