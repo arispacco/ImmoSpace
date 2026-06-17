@@ -255,6 +255,40 @@ def patch_ios():
     with open(plist_path, 'w') as f:
         f.write(content)
         
+    # Patch ios/Podfile
+    podfile_path = 'ios/Podfile'
+    if os.path.exists(podfile_path):
+        print("Patching ios/Podfile...")
+        with open(podfile_path, 'r') as f:
+            podfile_content = f.read()
+            
+        # Set global platform to ios 13.0
+        podfile_content = re.sub(
+            r'#\s*platform\s*:\s*ios,\s*[\'"]\d+(?:\.\d+)*[\'"]',
+            "platform :ios, '13.0'",
+            podfile_content
+        )
+        podfile_content = re.sub(
+            r'platform\s*:\s*ios,\s*[\'"]\d+(?:\.\d+)*[\'"]',
+            "platform :ios, '13.0'",
+            podfile_content
+        )
+        
+        # Override individual pod targets deployment target and code signing
+        original_line = 'flutter_additional_ios_build_settings(target)'
+        replacement = """flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+    end"""
+        
+        if original_line in podfile_content:
+            podfile_content = podfile_content.replace(original_line, replacement)
+            
+        with open(podfile_path, 'w') as f:
+            f.write(podfile_content)
+            
     print("iOS platform files patched successfully.")
 
 def fix_ar_flutter_plugin():
