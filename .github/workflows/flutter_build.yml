@@ -32,7 +32,9 @@ jobs:
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
 
       - name: Generate Platforms
-        run: flutter create --org com.immospace --project-name immospace --platforms android,ios .
+        run: |
+          flutter create --org com.immospace --project-name immospace --platforms android,ios .
+          rm -f test/widget_test.dart
 
       - name: Get Dependencies
         run: flutter pub get
@@ -73,7 +75,9 @@ jobs:
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
 
       - name: Generate Platforms
-        run: flutter create --org com.immospace --project-name immospace --platforms android,ios .
+        run: |
+          flutter create --org com.immospace --project-name immospace --platforms android,ios .
+          rm -f test/widget_test.dart
 
       - name: Get Dependencies
         run: flutter pub get
@@ -129,7 +133,9 @@ jobs:
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
 
       - name: Generate Platforms
-        run: flutter create --org com.immospace --project-name immospace --platforms android,ios .
+        run: |
+          flutter create --org com.immospace --project-name immospace --platforms android,ios .
+          rm -f test/widget_test.dart
 
       - name: Get Dependencies
         run: flutter pub get

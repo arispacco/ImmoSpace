@@ -227,6 +227,18 @@ def patch_android():
         with open(kts_path, 'w') as f:
             f.write(kts_content)
             
+    # 5. Patch gradle.properties to allow duplicate namespaces for Sceneform
+    properties_path = 'android/gradle.properties'
+    if os.path.exists(properties_path):
+        with open(properties_path, 'r') as f:
+            properties_content = f.read()
+        
+        if 'android.uniquePackageNames' not in properties_content:
+            properties_content += '\nandroid.uniquePackageNames=false\n'
+            
+        with open(properties_path, 'w') as f:
+            f.write(properties_content)
+            
     print("Android platform files patched successfully.")
 
 def patch_ios():
