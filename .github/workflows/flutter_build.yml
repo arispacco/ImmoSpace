@@ -83,7 +83,11 @@ jobs:
         run: flutter pub get
 
       - name: Patch Platform Configurations
-        run: python3 scripts/patch_platforms.py
+        run: |
+          python3 scripts/patch_platforms.py
+          echo "use_frameworks! :linkage => :static" >> ios/Podfile || true
+          echo "android.enableR8.fullMode=false" >> android/gradle.properties || true
+          echo "-ignorewarnings" >> android/app/proguard-rules.pro || true
 
       - name: Set up Java Development Kit (JDK)
         uses: actions/setup-java@v4
@@ -141,9 +145,11 @@ jobs:
         run: flutter pub get
 
       - name: Patch Platform Configurations
-        run: python3 scripts/patch_platforms.py
-
-      - name: Build iOS Runner (Unsigned)
+        run: |
+          python3 scripts/patch_platforms.py
+          echo "use_frameworks! :linkage => :static" >> ios/Podfile
+          echo "android.enableR8.fullMode=false" >> android/gradle.properties
+          echo "-ignorewarnings" >> android/app/proguard-rules.pro
         id: ios_build
         shell: bash
         run: |
