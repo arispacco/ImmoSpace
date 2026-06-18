@@ -1,14 +1,14 @@
 # CI Diagnostic Report
 
 - Workflow: Flutter CI/CD Build
-- Run: 26 (27709918100)
+- Run: 27 (27713765335)
 - Branch: main
-- Commit: 16702cb594d474ac39f12449eecec18f3db605e0
-- Generated: 2026-06-17 18:20:59 UTC
+- Commit: f5702fee6f2ccfd2d0f04d3012a67f01a714ac3d
+- Generated: 2026-06-17 19:28:41 UTC
 - Flutter: 3.44.1
 
 ## Flutter analyze
-- Job result: failure
+- Job result: success
 - Command exit code: unknown
 
 ### Probable causes
@@ -112,7 +112,7 @@
 94:   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement • lib/features/vr_tour/presentation/widgets/pulsing_hotspot.dart:120:33 • deprecated_member_use
 95:   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement • lib/features/vr_tour/presentation/widgets/pulsing_hotspot.dart:123:46 • deprecated_member_use
 96-
-97-93 issues found. (ran in 7.9s)
+97-93 issues found. (ran in 6.5s)
 ```
 
 ### Last 300 log lines
@@ -164,8 +164,8 @@ See ci_reports/logs/flutter_analyze_tail.log after pulling the report commit.
 291-> Get more help at https://help.gradle.org.
 292-==============================================================================
 293-
-294:BUILD FAILED in 4m 21s
-295-Running Gradle task 'assembleRelease'...                          262.1s
+294:BUILD FAILED in 4m 12s
+295-Running Gradle task 'assembleRelease'...                          252.8s
 296-Gradle task assembleRelease failed with exit code 1
 ```
 

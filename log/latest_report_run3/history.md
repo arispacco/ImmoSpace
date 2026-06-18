@@ -69,9 +69,9 @@
 - Android probable causes:
   - Log missing: the job probably failed before the command was captured.
 
-## 2026-06-17 18:20:59 UTC - run 26
-- Commit: 16702cb594d474ac39f12449eecec18f3db605e0
-- Analyze: failure, exit unknown
+## 2026-06-17 19:28:41 UTC - run 27
+- Commit: f5702fee6f2ccfd2d0f04d3012a67f01a714ac3d
+- Analyze: success, exit unknown
 - Android: failure, exit unknown
 - iOS: failure, exit unknown
 - Main report: ci_reports/latest.md
